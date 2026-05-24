@@ -11,6 +11,7 @@ export default function HomePage() {
   // Default to 'price' — most users want cheapest first
   const [mode, setMode] = useState<SearchMode>('price')
   const [flights, setFlights] = useState<FlightResult[]>([])
+  const [cheapest, setCheapest] = useState<FlightResult[]>([])
   const [isMock, setIsMock] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -37,10 +38,12 @@ export default function HomePage() {
     try {
       const data = await fetchFlights(query, mode)
       setFlights(data.flights)
+      setCheapest(data.cheapest ?? [])
       setIsMock(!!data.isMock)
     } catch (err) {
       setError(err instanceof Error ? err.message : '検索に失敗しました')
       setFlights([])
+      setCheapest([])
     } finally {
       setIsLoading(false)
     }
@@ -53,6 +56,7 @@ export default function HomePage() {
     try {
       const data = await fetchFlights(lastQuery, newMode)
       setFlights(data.flights)
+      setCheapest(data.cheapest ?? [])
       setIsMock(!!data.isMock)
     } catch {
       // keep existing results on re-sort failure
@@ -117,6 +121,7 @@ export default function HomePage() {
 
             <FlightResults
               flights={flights}
+              cheapest={cheapest}
               isLoading={isLoading}
               error={error}
               query={lastQuery}

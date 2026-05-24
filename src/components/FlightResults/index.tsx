@@ -9,6 +9,7 @@ import ExternalLinks from '@/components/ExternalLinks'
 
 interface Props {
   flights: FlightResult[]
+  cheapest?: FlightResult[]
   isLoading: boolean
   error?: string
   query?: SearchQuery | null
@@ -46,6 +47,90 @@ function formatDateShort(iso: string): string {
     weekday: 'short',
     timeZone: 'Asia/Tokyo',
   })
+}
+
+// ─── Travelpayouts cheapest section ───────────────────────────────────────────
+function airlineEmoji(code: string): string {
+  const map: Record<string, string> = {
+    JL: '🔴', NH: '🔵', MM: '🟣', JW: '🟠', BC: '🟡',
+    SQ: '🟢', TG: '🟤', CX: '⚫', KE: '🔵', OZ: '🔵',
+    BA: '🔵', AF: '🔵', LH: '🟡', UA: '🔵', DL: '🔵',
+    AA: '🔴', EK: '🟢', QR: '🟤',
+  }
+  return map[code] ?? '✈️'
+}
+
+function stopsLabel(stops: number | undefined): string {
+  if (stops == null) return '乗り継ぎ情報なし'
+  return stops === 0 ? '直行便' : `${stops}回乗り継ぎ`
+}
+
+function CheapestCard({ flight }: { flight: FlightResult }) {
+  const seg = flight.segments[0]
+  // v1 entries have carrierCode; v2 entries have only carrierName (OTA name like "Trip.com")
+  const hasAirline = !!seg.carrierCode
+  const label = hasAirline
+    ? `${seg.carrierCode} ${seg.flightNumber}`
+    : seg.carrierName || '各社最安値'
+  const icon = hasAirline ? airlineEmoji(seg.carrierCode) : '🌐'
+
+  return (
+    <a
+      href={flight.bookingLink}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center justify-between gap-3 bg-white rounded-xl border border-emerald-200 px-4 py-3 hover:bg-emerald-50 transition-colors group"
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="text-lg shrink-0">{icon}</span>
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-gray-800 truncate">{label}</p>
+          <p className="text-xs text-gray-400">
+            {stopsLabel(flight.stops)}
+            {flight.totalDuration > 0 && ` · ${formatDurationJa(flight.totalDuration)}`}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 shrink-0">
+        <p className="text-xl font-extrabold text-emerald-700">
+          ¥{Math.round(flight.totalPrice).toLocaleString()}
+        </p>
+        <span className="text-xs bg-emerald-600 group-hover:bg-emerald-700 text-white font-bold rounded-lg px-2.5 py-1.5 transition-colors whitespace-nowrap">
+          この価格で予約 →
+        </span>
+      </div>
+    </a>
+  )
+}
+
+function CheapestSection({ flights, isLoading }: { flights: FlightResult[]; isLoading: boolean }) {
+  return (
+    <div className="bg-emerald-50 rounded-2xl border border-emerald-200 shadow-sm p-4">
+      <div className="flex items-center gap-1.5 mb-3">
+        <span className="text-base">💸</span>
+        <span className="text-sm font-bold text-emerald-800">Travelpayouts最安値</span>
+        <span className="text-xs text-emerald-600 ml-1">各社横断比較</span>
+      </div>
+
+      {isLoading ? (
+        <p className="text-xs text-emerald-700 text-center py-2">価格データ取得中...</p>
+      ) : flights.length === 0 ? (
+        <p className="text-xs text-gray-400 text-center py-2">
+          この区間の最安値データが見つかりませんでした
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {flights.map((f) => (
+            <CheapestCard key={f.id} flight={f} />
+          ))}
+        </div>
+      )}
+
+      <p className="text-xs text-emerald-600 mt-2 text-right">
+        Powered by Travelpayouts · Aviasales
+      </p>
+    </div>
+  )
 }
 
 // ─── Rank badges ──────────────────────────────────────────────────────────────
@@ -244,8 +329,8 @@ function Skeleton() {
 }
 
 // ─── Main export ───────────────────────────────────────────────────────────────
-export default function FlightResults({ flights, isLoading, error, query }: Props) {
-  if (isLoading) return <Skeleton />
+export default function FlightResults({ flights, cheapest = [], isLoading, error, query }: Props) {
+  const showCheapest = !!(query?.origin && query?.destination && query?.departureDate)
 
   if (error) {
     return (
@@ -256,35 +341,39 @@ export default function FlightResults({ flights, isLoading, error, query }: Prop
     )
   }
 
-  if (flights.length === 0) {
-    return (
-      <div className="text-center py-16 text-gray-400">
-        <Plane size={48} className="mx-auto mb-3 opacity-30" />
-        <p className="text-lg font-medium">検索結果がありません</p>
-        <p className="text-sm">条件を変えて再検索してください</p>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-3">
-      {/* External links — always at the very top of results */}
-      {query?.origin && query?.destination && query?.departureDate && (
+      {/* External links */}
+      {showCheapest && (
         <ExternalLinks
-          origin={query.origin}
-          destination={query.destination}
-          departureDate={query.departureDate}
-          returnDate={query.returnDate}
+          origin={query!.origin}
+          destination={query!.destination}
+          departureDate={query!.departureDate}
+          returnDate={query!.returnDate}
         />
       )}
 
-      <p className="text-sm text-gray-500 px-0.5">
-        {flights.length}件の検索結果
-      </p>
+      {/* Travelpayouts cheapest fares — always shown once a query exists */}
+      {showCheapest && (
+        <CheapestSection flights={cheapest} isLoading={isLoading} />
+      )}
 
-      {flights.map((flight, i) => (
-        <FlightCard key={flight.id} flight={flight} rank={i + 1} />
-      ))}
+      {isLoading ? (
+        <Skeleton />
+      ) : flights.length === 0 ? (
+        <div className="text-center py-10 text-gray-400">
+          <Plane size={48} className="mx-auto mb-3 opacity-30" />
+          <p className="text-lg font-medium">検索結果がありません</p>
+          <p className="text-sm">条件を変えて再検索してください</p>
+        </div>
+      ) : (
+        <>
+          <p className="text-sm text-gray-500 px-0.5">{flights.length}件の検索結果</p>
+          {flights.map((flight, i) => (
+            <FlightCard key={flight.id} flight={flight} rank={i + 1} />
+          ))}
+        </>
+      )}
     </div>
   )
 }
