@@ -12,22 +12,8 @@ interface Props {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const AIRLINE_NAMES: Record<string, string> = {
-  JL: 'Japan Airlines', NH: 'ANA', MM: 'Peach Aviation',
-  BC: 'Skymark', GK: 'Jetstar Japan', NU: 'JTA',
-  JW: 'Vanilla Air', SQ: 'Singapore Airlines', TG: 'Thai Airways',
-  CX: 'Cathay Pacific', KE: 'Korean Air', OZ: 'Asiana',
-  CI: 'China Airlines', BR: 'EVA Air', BA: 'British Airways',
-  AF: 'Air France', LH: 'Lufthansa', UA: 'United', DL: 'Delta',
-  AA: 'American Airlines', EK: 'Emirates', QR: 'Qatar Airways',
-  MH: 'Malaysia Airlines', GA: 'Garuda Indonesia',
-}
-
-const AIRLINE_EMOJI: Record<string, string> = {
-  JL: '🔴', NH: '🔵', MM: '🟣', JW: '🟠', BC: '🟡', GK: '🟠',
-  SQ: '🟢', TG: '🟤', CX: '⚫', KE: '🔵', OZ: '🔵',
-  BA: '🔵', AF: '🔵', LH: '🟡', UA: '🔵', DL: '🔵',
-  AA: '🔴', EK: '🟢', QR: '🟤',
+function airlineLogoUrl(iata: string): string {
+  return `https://logos.skyscnr.com/images/airlines/favicon/${iata}.png`
 }
 
 function formatDurationJa(minutes: number): string {
@@ -56,9 +42,8 @@ function TpCard({ flight, badge }: { flight: FlightResult; badge?: string }) {
   const seg = flight.segments[0]
   const hasAirline = !!seg.carrierCode
   const airlineName = hasAirline
-    ? (AIRLINE_NAMES[seg.carrierCode] ?? seg.carrierCode)
+    ? (seg.carrierName || seg.carrierCode)
     : (seg.carrierName || '各社最安値')
-  const emoji = hasAirline ? (AIRLINE_EMOJI[seg.carrierCode] ?? '✈️') : '🌐'
 
   return (
     <a
@@ -73,7 +58,24 @@ function TpCard({ flight, badge }: { flight: FlightResult; badge?: string }) {
       ].join(' ')}
     >
       <div className="flex items-center gap-3 min-w-0">
-        <span className="text-3xl shrink-0" aria-hidden="true">{emoji}</span>
+        {hasAirline ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={airlineLogoUrl(seg.carrierCode)}
+            alt={airlineName}
+            className="w-9 h-9 rounded-full object-contain bg-gray-50 shrink-0"
+            onError={(e) => {
+              const t = e.currentTarget
+              t.style.display = 'none'
+              const span = document.createElement('span')
+              span.textContent = '✈️'
+              span.className = 'text-3xl shrink-0'
+              t.parentNode?.insertBefore(span, t)
+            }}
+          />
+        ) : (
+          <span className="text-3xl shrink-0" aria-hidden="true">🌐</span>
+        )}
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-bold text-gray-900 text-base leading-tight">{airlineName}</p>
