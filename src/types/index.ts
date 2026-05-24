@@ -57,6 +57,12 @@ export interface AlertRequest {
   departureDate: string
 }
 
+export interface CategorizedFlights {
+  cheapest: FlightResult[]
+  cheapestDirect: FlightResult[]
+  recommended: FlightResult[]
+}
+
 export interface ModeConfig {
   id: SearchMode
   label: string

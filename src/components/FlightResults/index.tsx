@@ -1,11 +1,11 @@
 'use client'
 
 import { Plane, Clock, Zap } from 'lucide-react'
-import type { FlightResult, SearchQuery } from '@/types'
+import type { CategorizedFlights, FlightResult, SearchQuery } from '@/types'
 import ExternalLinks from '@/components/ExternalLinks'
 
 interface Props {
-  flights: FlightResult[]
+  categorized: CategorizedFlights | null
   isLoading: boolean
   error?: string
   query?: SearchQuery | null
@@ -52,7 +52,7 @@ function formatDepDate(iso: string): string {
 }
 
 // ─── Flight card ───────────────────────────────────────────────────────────────
-function TpCard({ flight, rank }: { flight: FlightResult; rank: number }) {
+function TpCard({ flight, badge }: { flight: FlightResult; badge?: string }) {
   const seg = flight.segments[0]
   const hasAirline = !!seg.carrierCode
   const airlineName = hasAirline
@@ -69,18 +69,17 @@ function TpCard({ flight, rank }: { flight: FlightResult; rank: number }) {
         'flex flex-col sm:flex-row sm:items-center sm:justify-between',
         'gap-4 rounded-2xl border bg-white px-5 py-5',
         'shadow-sm hover:shadow-md transition-all group',
-        rank === 1 ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-gray-200',
+        badge ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-gray-200',
       ].join(' ')}
     >
-      {/* ── Left: airline info ── */}
       <div className="flex items-center gap-3 min-w-0">
         <span className="text-3xl shrink-0" aria-hidden="true">{emoji}</span>
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-bold text-gray-900 text-base leading-tight">{airlineName}</p>
-            {rank === 1 && (
+            {badge && (
               <span className="text-xs bg-indigo-600 text-white font-bold rounded-full px-2 py-0.5 shrink-0">
-                最安
+                {badge}
               </span>
             )}
           </div>
@@ -91,9 +90,7 @@ function TpCard({ flight, rank }: { flight: FlightResult; rank: number }) {
         </div>
       </div>
 
-      {/* ── Right: price + meta + button ── */}
       <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t border-gray-100 pt-3 sm:border-0 sm:pt-0">
-        {/* Price + stops/duration */}
         <div>
           <p className="text-2xl font-bold text-indigo-700 tabular-nums leading-none">
             ¥{Math.round(flight.totalPrice).toLocaleString()}
@@ -116,7 +113,6 @@ function TpCard({ flight, rank }: { flight: FlightResult; rank: number }) {
           </div>
         </div>
 
-        {/* Booking button */}
         <span className="bg-green-500 group-hover:bg-green-600 text-white font-bold rounded-xl px-6 py-3 transition-colors whitespace-nowrap text-sm shrink-0">
           今すぐ予約 →
         </span>
@@ -125,28 +121,96 @@ function TpCard({ flight, rank }: { flight: FlightResult; rank: number }) {
   )
 }
 
+// ─── Category section ─────────────────────────────────────────────────────────
+interface CategoryConfig {
+  key: keyof CategorizedFlights
+  icon: string
+  title: string
+  badge: string
+  emptyMsg: string
+  headerColor: string
+}
+
+const CATEGORIES: CategoryConfig[] = [
+  {
+    key: 'cheapest',
+    icon: '💰',
+    title: '最安値',
+    badge: '最安',
+    emptyMsg: '該当する便が見つかりませんでした',
+    headerColor: 'text-indigo-700',
+  },
+  {
+    key: 'cheapestDirect',
+    icon: '⚡',
+    title: '直行便最安',
+    badge: '直行最安',
+    emptyMsg: '直行便は見つかりませんでした',
+    headerColor: 'text-blue-600',
+  },
+  {
+    key: 'recommended',
+    icon: '⭐',
+    title: '総合おすすめ',
+    badge: 'おすすめ',
+    emptyMsg: '該当する便が見つかりませんでした',
+    headerColor: 'text-green-600',
+  },
+]
+
+function CategorySection({
+  config,
+  flights,
+}: {
+  config: CategoryConfig
+  flights: FlightResult[]
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 px-0.5">
+        <span className="text-lg" aria-hidden="true">{config.icon}</span>
+        <h2 className={`font-bold text-base ${config.headerColor}`}>{config.title}</h2>
+      </div>
+      {flights.length === 0 ? (
+        <div className="text-center py-6 text-gray-400 text-sm bg-gray-50 rounded-2xl border border-gray-100">
+          {config.emptyMsg}
+        </div>
+      ) : (
+        flights.map((flight, i) => (
+          <TpCard key={flight.id} flight={flight} badge={i === 0 ? config.badge : undefined} />
+        ))
+      )}
+    </div>
+  )
+}
+
 // ─── Loading skeleton ──────────────────────────────────────────────────────────
 function Skeleton() {
   return (
-    <div className="space-y-3">
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-gray-200 px-5 py-5 animate-pulse">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-gray-200 shrink-0" />
-              <div className="space-y-2">
-                <div className="h-4 w-28 bg-gray-200 rounded" />
-                <div className="h-3 w-20 bg-gray-100 rounded" />
+    <div className="space-y-6">
+      {[...Array(3)].map((_, si) => (
+        <div key={si} className="space-y-2">
+          <div className="h-5 w-24 bg-gray-200 rounded animate-pulse" />
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl border border-gray-200 px-5 py-5 animate-pulse">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-gray-200 shrink-0" />
+                  <div className="space-y-2">
+                    <div className="h-4 w-28 bg-gray-200 rounded" />
+                    <div className="h-3 w-20 bg-gray-100 rounded" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="space-y-1.5">
+                    <div className="h-6 w-24 bg-gray-200 rounded" />
+                    <div className="h-3 w-16 bg-gray-100 rounded" />
+                  </div>
+                  <div className="h-11 w-28 bg-gray-200 rounded-xl" />
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="space-y-1.5">
-                <div className="h-6 w-24 bg-gray-200 rounded" />
-                <div className="h-3 w-16 bg-gray-100 rounded" />
-              </div>
-              <div className="h-11 w-28 bg-gray-200 rounded-xl" />
-            </div>
-          </div>
+          ))}
         </div>
       ))}
     </div>
@@ -154,8 +218,14 @@ function Skeleton() {
 }
 
 // ─── Main export ───────────────────────────────────────────────────────────────
-export default function FlightResults({ flights, isLoading, error, query }: Props) {
+export default function FlightResults({ categorized, isLoading, error, query }: Props) {
   const hasQuery = !!(query?.origin && query?.destination && query?.departureDate)
+  const hasResults = !!(
+    categorized &&
+    (categorized.cheapest.length > 0 ||
+      categorized.cheapestDirect.length > 0 ||
+      categorized.recommended.length > 0)
+  )
 
   if (error) {
     return (
@@ -167,7 +237,7 @@ export default function FlightResults({ flights, isLoading, error, query }: Prop
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       {hasQuery && (
         <ExternalLinks
           origin={query!.origin}
@@ -179,7 +249,7 @@ export default function FlightResults({ flights, isLoading, error, query }: Prop
 
       {isLoading ? (
         <Skeleton />
-      ) : flights.length === 0 ? (
+      ) : !hasResults ? (
         <div className="text-center py-16 text-gray-400">
           <Plane size={48} className="mx-auto mb-3 opacity-30" />
           <p className="text-lg font-medium">検索結果がありません</p>
@@ -188,10 +258,14 @@ export default function FlightResults({ flights, isLoading, error, query }: Prop
       ) : (
         <>
           <p className="text-sm text-gray-500 px-0.5">
-            {flights.length}件の最安値 · Powered by Travelpayouts
+            Powered by Travelpayouts · 最大9件を3カテゴリで表示
           </p>
-          {flights.map((flight, i) => (
-            <TpCard key={flight.id} flight={flight} rank={i + 1} />
+          {CATEGORIES.map((cfg) => (
+            <CategorySection
+              key={cfg.key}
+              config={cfg}
+              flights={categorized![cfg.key]}
+            />
           ))}
         </>
       )}

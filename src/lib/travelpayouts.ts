@@ -106,7 +106,7 @@ async function fetchV2(query: SearchQuery): Promise<FlightResult[]> {
     destination: query.destination,
     currency: 'jpy',
     token: TOKEN,
-    limit: '10',
+    limit: '50',
     sorting: 'price',
   })
 
@@ -172,5 +172,5 @@ export async function searchCheapFlights(query: SearchQuery): Promise<FlightResu
     }
   }
 
-  return merged.sort((a, b) => a.totalPrice - b.totalPrice).slice(0, 10)
+  return merged.sort((a, b) => a.totalPrice - b.totalPrice)
 }

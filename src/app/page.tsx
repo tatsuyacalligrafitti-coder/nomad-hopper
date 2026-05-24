@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useMemo, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { Plane } from 'lucide-react'
 import SearchBar, { type SearchBarHandle } from '@/components/SearchBar'
 import ModeSelector from '@/components/ModeSelector'
 import FlightResults from '@/components/FlightResults'
-import { sortFlights } from '@/lib/sorting'
-import type { FlightResult, SearchMode, SearchQuery } from '@/types'
+import type { CategorizedFlights, SearchMode, SearchQuery } from '@/types'
 
 const MODE_HINTS: Record<SearchMode, string> = {
   price:   'お得な最安値の航空券を探します',
@@ -16,7 +15,7 @@ const MODE_HINTS: Record<SearchMode, string> = {
 }
 
 export default function HomePage() {
-  const [rawFlights, setRawFlights] = useState<FlightResult[]>([])
+  const [categorized, setCategorized] = useState<CategorizedFlights | null>(null)
   const [mode, setMode] = useState<SearchMode>('price')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -24,11 +23,6 @@ export default function HomePage() {
   const [lastQuery, setLastQuery] = useState<SearchQuery | null>(null)
 
   const searchBarRef = useRef<SearchBarHandle>(null)
-
-  const flights = useMemo(
-    () => sortFlights(rawFlights, mode),
-    [rawFlights, mode],
-  )
 
   const handleModeChange = (newMode: SearchMode) => {
     setMode(newMode)
@@ -51,10 +45,10 @@ export default function HomePage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setRawFlights(data.flights ?? [])
+      setCategorized(data.categorized ?? null)
     } catch (err) {
       setError(err instanceof Error ? err.message : '検索に失敗しました')
-      setRawFlights([])
+      setCategorized(null)
     } finally {
       setIsLoading(false)
     }
@@ -112,7 +106,7 @@ export default function HomePage() {
         {/* Results */}
         {searched && (
           <FlightResults
-            flights={flights}
+            categorized={categorized}
             isLoading={isLoading}
             error={error}
             query={lastQuery}
