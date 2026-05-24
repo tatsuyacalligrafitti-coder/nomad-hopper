@@ -1,6 +1,6 @@
 'use client'
 
-import { Plane } from 'lucide-react'
+import { Plane, Clock, Zap } from 'lucide-react'
 import type { FlightResult, SearchQuery } from '@/types'
 import ExternalLinks from '@/components/ExternalLinks'
 
@@ -45,19 +45,13 @@ function formatDepDate(iso: string): string {
     weekday: 'short',
     timeZone: 'Asia/Tokyo',
   })
-  // Show time only if not midnight
   const h = d.getHours()
   const m = d.getMinutes()
   if (h === 0 && m === 0) return dateStr
   return `${dateStr} ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}発`
 }
 
-function stopsLabel(stops: number | undefined): string {
-  if (stops == null) return ''
-  return stops === 0 ? '直行' : `${stops}回乗り継ぎ`
-}
-
-// ─── Flight card (Travelpayouts) ──────────────────────────────────────────────
+// ─── Flight card ───────────────────────────────────────────────────────────────
 function TpCard({ flight, rank }: { flight: FlightResult; rank: number }) {
   const seg = flight.segments[0]
   const hasAirline = !!seg.carrierCode
@@ -66,48 +60,65 @@ function TpCard({ flight, rank }: { flight: FlightResult; rank: number }) {
     : (seg.carrierName || '各社最安値')
   const emoji = hasAirline ? (AIRLINE_EMOJI[seg.carrierCode] ?? '✈️') : '🌐'
 
-  const meta = [
-    formatDepDate(seg.departingAt),
-    stopsLabel(flight.stops),
-    flight.totalDuration > 0 ? formatDurationJa(flight.totalDuration) : '',
-  ].filter(Boolean).join(' · ')
-
   return (
     <a
       href={flight.bookingLink}
       target="_blank"
       rel="noopener noreferrer"
       className={[
-        'flex items-center justify-between gap-4 rounded-2xl border bg-white px-4 py-4 shadow-sm hover:shadow-md transition-all group',
+        'flex flex-col sm:flex-row sm:items-center sm:justify-between',
+        'gap-4 rounded-2xl border bg-white px-5 py-5',
+        'shadow-sm hover:shadow-md transition-all group',
         rank === 1 ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-gray-200',
       ].join(' ')}
     >
-      {/* ── Airline info ── */}
+      {/* ── Left: airline info ── */}
       <div className="flex items-center gap-3 min-w-0">
-        <span className="text-2xl shrink-0">{emoji}</span>
+        <span className="text-3xl shrink-0" aria-hidden="true">{emoji}</span>
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="font-bold text-gray-900 truncate">{airlineName}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-bold text-gray-900 text-base leading-tight">{airlineName}</p>
             {rank === 1 && (
-              <span className="shrink-0 text-xs bg-indigo-600 text-white font-bold rounded-full px-2 py-0.5">
+              <span className="text-xs bg-indigo-600 text-white font-bold rounded-full px-2 py-0.5 shrink-0">
                 最安
               </span>
             )}
           </div>
           {hasAirline && seg.flightNumber && (
-            <p className="text-xs text-gray-400">{seg.flightNumber}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{seg.flightNumber}</p>
           )}
-          <p className="text-xs text-gray-500 mt-0.5">{meta}</p>
+          <p className="text-xs text-gray-400 mt-1">{formatDepDate(seg.departingAt)}</p>
         </div>
       </div>
 
-      {/* ── Price + button ── */}
-      <div className="flex items-center gap-3 shrink-0">
-        <p className="text-2xl sm:text-3xl font-extrabold text-indigo-700 tabular-nums">
-          ¥{Math.round(flight.totalPrice).toLocaleString()}
-        </p>
-        <span className="text-sm bg-indigo-600 group-hover:bg-indigo-700 text-white font-bold rounded-xl px-3 py-2 transition-colors whitespace-nowrap">
-          予約する →
+      {/* ── Right: price + meta + button ── */}
+      <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t border-gray-100 pt-3 sm:border-0 sm:pt-0">
+        {/* Price + stops/duration */}
+        <div>
+          <p className="text-2xl font-bold text-indigo-700 tabular-nums leading-none">
+            ¥{Math.round(flight.totalPrice).toLocaleString()}
+          </p>
+          <div className="flex items-center gap-2 mt-1.5 text-xs flex-wrap">
+            {flight.stops === 0 ? (
+              <span className="flex items-center gap-0.5 text-blue-600 font-semibold">
+                <Zap size={11} />直行便
+              </span>
+            ) : flight.stops != null ? (
+              <span className="text-orange-500 font-medium">
+                {flight.stops}回乗り継ぎ
+              </span>
+            ) : null}
+            {flight.totalDuration > 0 && (
+              <span className="flex items-center gap-0.5 text-gray-500">
+                <Clock size={11} />{formatDurationJa(flight.totalDuration)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Booking button */}
+        <span className="bg-green-500 group-hover:bg-green-600 text-white font-bold rounded-xl px-6 py-3 transition-colors whitespace-nowrap text-sm shrink-0">
+          今すぐ予約 →
         </span>
       </div>
     </a>
@@ -119,17 +130,22 @@ function Skeleton() {
   return (
     <div className="space-y-3">
       {[...Array(5)].map((_, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-gray-200 p-4 animate-pulse flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gray-200" />
-            <div className="space-y-2">
-              <div className="h-4 w-32 bg-gray-200 rounded" />
-              <div className="h-3 w-48 bg-gray-100 rounded" />
+        <div key={i} className="bg-white rounded-2xl border border-gray-200 px-5 py-5 animate-pulse">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-gray-200 shrink-0" />
+              <div className="space-y-2">
+                <div className="h-4 w-28 bg-gray-200 rounded" />
+                <div className="h-3 w-20 bg-gray-100 rounded" />
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-24 bg-gray-200 rounded" />
-            <div className="h-9 w-20 bg-gray-100 rounded-xl" />
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="space-y-1.5">
+                <div className="h-6 w-24 bg-gray-200 rounded" />
+                <div className="h-3 w-16 bg-gray-100 rounded" />
+              </div>
+              <div className="h-11 w-28 bg-gray-200 rounded-xl" />
+            </div>
           </div>
         </div>
       ))}
@@ -152,7 +168,6 @@ export default function FlightResults({ flights, isLoading, error, query }: Prop
 
   return (
     <div className="space-y-3">
-      {/* External links */}
       {hasQuery && (
         <ExternalLinks
           origin={query!.origin}

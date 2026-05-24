@@ -65,7 +65,7 @@ export default function HomePage() {
       <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100 sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-2">
           <div className="flex items-center gap-2 text-indigo-700">
-            <Plane size={22} className="-rotate-45" />
+            <Plane size={22} style={{ transform: 'rotate(-45deg)' }} />
             <span className="text-xl font-extrabold tracking-tight">Nomad Hopper</span>
           </div>
           <span className="text-xs text-gray-400 hidden sm:block">
@@ -79,7 +79,7 @@ export default function HomePage() {
         {/* Hero - always visible */}
         <div className="text-center pt-4 pb-4">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-2xl mb-4">
-            <Plane size={32} className="text-indigo-600 -rotate-45" />
+            <Plane size={32} className="text-indigo-600" style={{ transform: 'rotate(-45deg)' }} />
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-2">
             話すように<span className="text-indigo-600">検索</span>しよう
