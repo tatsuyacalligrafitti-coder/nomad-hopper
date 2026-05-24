@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+:root {
+  --font-geist: '';
+}
+
+body {
+  font-family: var(--font-geist), system-ui, -apple-system, sans-serif;
+}
