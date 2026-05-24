@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { Search, Loader2, MapPin, Calendar, Users } from 'lucide-react'
 import type { SearchQuery, ParsedQuery } from '@/types'
 
@@ -16,12 +16,24 @@ interface Props {
   isLoading: boolean
 }
 
-export default function SearchBar({ onSearch, isLoading }: Props) {
+export interface SearchBarHandle {
+  focus: () => void
+}
+
+const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
+  { onSearch, isLoading },
+  ref,
+) {
   const [rawQuery, setRawQuery] = useState('')
   const [parsed, setParsed] = useState<ParsedQuery | null>(null)
   const [isParsing, setIsParsing] = useState(false)
   const [error, setError] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+  }))
 
   useEffect(() => {
     if (!rawQuery.trim()) {
@@ -80,6 +92,7 @@ export default function SearchBar({ onSearch, isLoading }: Props) {
         <div className="flex items-center gap-2 bg-white rounded-2xl shadow-lg border border-gray-200 px-4 py-3 focus-within:ring-2 focus-within:ring-indigo-400 transition-all">
           <Search className="text-gray-400 shrink-0" size={20} />
           <input
+            ref={inputRef}
             type="text"
             value={rawQuery}
             onChange={(e) => setRawQuery(e.target.value)}
@@ -92,17 +105,12 @@ export default function SearchBar({ onSearch, isLoading }: Props) {
             disabled={isLoading || !rawQuery.trim()}
             className="shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white rounded-xl px-4 py-2 font-semibold text-sm transition-colors flex items-center gap-1.5"
           >
-            {isLoading ? (
-              <Loader2 className="animate-spin" size={16} />
-            ) : (
-              <Search size={16} />
-            )}
+            {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
             検索
           </button>
         </div>
       </form>
 
-      {/* Examples */}
       <div className="flex flex-wrap gap-2">
         {EXAMPLES.map((ex) => (
           <button
@@ -115,7 +123,6 @@ export default function SearchBar({ onSearch, isLoading }: Props) {
         ))}
       </div>
 
-      {/* Parsed preview */}
       {parsed && (parsed.origin || parsed.destination || parsed.departureDate) && (
         <div className="flex flex-wrap gap-3 text-sm text-gray-600">
           {parsed.origin && (
@@ -154,4 +161,6 @@ export default function SearchBar({ onSearch, isLoading }: Props) {
       {error && <p className="text-red-500 text-sm">{error}</p>}
     </div>
   )
-}
+})
+
+export default SearchBar
