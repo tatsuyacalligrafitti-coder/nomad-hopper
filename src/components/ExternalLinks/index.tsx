@@ -23,7 +23,11 @@ function googleFlightsUrl(p: Props): string {
 
 function skyscannerUrl(p: Props): string {
   const dep = toYYMMDD(p.departureDate)
-  return `https://www.skyscanner.jp/transport/flights/${p.origin}/${p.destination}/${dep}/`
+  const ret = p.returnDate ? toYYMMDD(p.returnDate) : ''
+  const path = ret
+    ? `${p.origin}/${p.destination}/${dep}/${ret}/`
+    : `${p.origin}/${p.destination}/${dep}/`
+  return `https://www.skyscanner.jp/transport/flights/${path}`
 }
 
 function jetstarUrl(p: Props): string {
