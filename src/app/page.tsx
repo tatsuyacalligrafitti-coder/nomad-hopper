@@ -10,7 +10,7 @@ import type { CategorizedFlights, SearchMode, SearchQuery } from '@/types'
 const MODE_HINTS: Record<SearchMode, string> = {
   price:   'お得な最安値の航空券を探します',
   balance: '価格と快適さのバランスで探します',
-  elegant: '快適で所要時間の短い便を探します',
+  elegant: 'ビジネスクラス専用・価格の安い順で表示',
   fastest: '最も早く到着する便を探します',
 }
 
@@ -35,13 +35,16 @@ export default function HomePage() {
     setIsLoading(true)
     setError('')
     setSearched(true)
-    setLastQuery(query)
+
+    const searchQuery: SearchQuery =
+      mode === 'elegant' ? { ...query, cabinClass: 'business' } : query
+    setLastQuery(searchQuery)
 
     try {
       const res = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query: searchQuery }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -110,6 +113,7 @@ export default function HomePage() {
             isLoading={isLoading}
             error={error}
             query={lastQuery}
+            mode={mode}
           />
         )}
 

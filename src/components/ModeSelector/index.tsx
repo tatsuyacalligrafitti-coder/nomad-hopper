@@ -11,7 +11,7 @@ const MODES: {
 }[] = [
   { id: 'price', label: '価格優先', emoji: '💰', description: '最安値を探す' },
   { id: 'balance', label: 'バランス', emoji: '⚖️', description: '価格と快適さのバランス' },
-  { id: 'elegant', label: '優雅', emoji: '✨', description: '快適さを重視' },
+  { id: 'elegant', label: '優雅', emoji: '✨', description: 'ビジネスクラス専用' },
   { id: 'fastest', label: '最速', emoji: '⚡', description: '最短時間で到着' },
 ]
 

@@ -9,6 +9,7 @@ interface Props {
   isLoading: boolean
   error?: string
   query?: SearchQuery | null
+  mode?: string
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -38,7 +39,7 @@ function formatDepDate(iso: string): string {
 }
 
 // ─── Flight card ───────────────────────────────────────────────────────────────
-function TpCard({ flight, badge }: { flight: FlightResult; badge?: string }) {
+function TpCard({ flight, badge, showBusinessBadge }: { flight: FlightResult; badge?: string; showBusinessBadge?: boolean }) {
   const seg = flight.segments[0]
   const hasAirline = !!seg.carrierCode
   const airlineName = hasAirline
@@ -79,6 +80,11 @@ function TpCard({ flight, badge }: { flight: FlightResult; badge?: string }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-bold text-gray-900 text-base leading-tight">{airlineName}</p>
+            {showBusinessBadge && (
+              <span className="text-xs bg-amber-500 text-white font-bold rounded-full px-2 py-0.5 shrink-0">
+                ビジネスクラス
+              </span>
+            )}
             {badge && (
               <span className="text-xs bg-indigo-600 text-white font-bold rounded-full px-2 py-0.5 shrink-0">
                 {badge}
@@ -163,23 +169,34 @@ const CATEGORIES: CategoryConfig[] = [
 function CategorySection({
   config,
   flights,
+  isElegant,
 }: {
   config: CategoryConfig
   flights: FlightResult[]
+  isElegant?: boolean
 }) {
+  const sorted = isElegant
+    ? [...flights].sort((a, b) => a.totalPrice - b.totalPrice)
+    : flights
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 px-0.5">
         <span className="text-lg" aria-hidden="true">{config.icon}</span>
         <h2 className={`font-bold text-base ${config.headerColor}`}>{config.title}</h2>
       </div>
-      {flights.length === 0 ? (
+      {sorted.length === 0 ? (
         <div className="text-center py-6 text-gray-400 text-sm bg-gray-50 rounded-2xl border border-gray-100">
           {config.emptyMsg}
         </div>
       ) : (
-        flights.map((flight, i) => (
-          <TpCard key={flight.id} flight={flight} badge={i === 0 ? config.badge : undefined} />
+        sorted.map((flight, i) => (
+          <TpCard
+            key={flight.id}
+            flight={flight}
+            badge={i === 0 ? config.badge : undefined}
+            showBusinessBadge={isElegant}
+          />
         ))
       )}
     </div>
@@ -220,7 +237,7 @@ function Skeleton() {
 }
 
 // ─── Main export ───────────────────────────────────────────────────────────────
-export default function FlightResults({ categorized, isLoading, error, query }: Props) {
+export default function FlightResults({ categorized, isLoading, error, query, mode }: Props) {
   const hasQuery = !!(query?.origin && query?.destination && query?.departureDate)
   const hasResults = !!(
     categorized &&
@@ -267,6 +284,7 @@ export default function FlightResults({ categorized, isLoading, error, query }: 
               key={cfg.key}
               config={cfg}
               flights={categorized![cfg.key]}
+              isElegant={mode === 'elegant'}
             />
           ))}
         </>
