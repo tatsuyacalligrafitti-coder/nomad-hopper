@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { Search, Loader2, MapPin, Calendar, Users } from 'lucide-react'
+import { parseSearchQuery } from '@/lib/parser'
 import type { SearchQuery, ParsedQuery } from '@/types'
 
 const EXAMPLES = [
@@ -62,26 +63,29 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
     e.preventDefault()
     setError('')
 
-    if (!parsed?.origin) {
+    // Use debounced parsed state, or fall back to synchronous parse on submit
+    const p = parsed ?? parseSearchQuery(rawQuery)
+
+    if (!p?.origin) {
       setError('出発地を認識できませんでした（例: 東京から、HND）')
       return
     }
-    if (!parsed?.destination) {
+    if (!p?.destination) {
       setError('目的地を認識できませんでした（例: バンコクへ、BKK）')
       return
     }
-    if (!parsed?.departureDate) {
+    if (!p?.departureDate) {
       setError('日程を認識できませんでした（例: 12月25日、来週）')
       return
     }
 
     onSearch({
-      origin: parsed.origin,
-      destination: parsed.destination,
-      departureDate: parsed.departureDate,
-      returnDate: parsed.returnDate ?? undefined,
-      passengers: parsed.passengers,
-      cabinClass: parsed.cabinClass,
+      origin: p.origin,
+      destination: p.destination,
+      departureDate: p.departureDate,
+      returnDate: p.returnDate ?? undefined,
+      passengers: p.passengers,
+      cabinClass: p.cabinClass,
       rawQuery,
     })
   }

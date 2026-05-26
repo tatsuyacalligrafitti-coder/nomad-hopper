@@ -160,9 +160,10 @@ export async function searchSkyscanner(query: SearchQuery): Promise<FlightResult
 
   if (query.returnDate) params.set('returnDate', query.returnDate)
 
+  // No cache: each search is unique by date/route; stale cached results cause wrong airline data
   const res = await fetch(`${BASE}/searchFlights?${params}`, {
     headers: rapidHeaders,
-    next: { revalidate: 600 },
+    cache: 'no-store',
   })
 
   if (res.status === 429) {
@@ -174,8 +175,26 @@ export async function searchSkyscanner(query: SearchQuery): Promise<FlightResult
     return []
   }
 
-  const json = await res.json() as { data?: { itineraries?: SkyItinerary[] } }
-  const itineraries = json.data?.itineraries ?? []
+  const json = await res.json() as {
+    data?: { context?: { status?: string }; itineraries?: SkyItinerary[] }
+  }
+
+  let itineraries = json.data?.itineraries ?? []
+
+  // Skyscanner returns "incomplete" on first call; poll once for more complete results
+  if (json.data?.context?.status === 'incomplete') {
+    await new Promise((r) => setTimeout(r, 1200))
+    const res2 = await fetch(`${BASE}/searchFlights?${params}`, {
+      headers: rapidHeaders,
+      cache: 'no-store',
+    })
+    if (res2.ok) {
+      const json2 = await res2.json() as { data?: { itineraries?: SkyItinerary[] } }
+      if ((json2.data?.itineraries?.length ?? 0) > itineraries.length) {
+        itineraries = json2.data!.itineraries!
+      }
+    }
+  }
 
   const results = itineraries.map((it) => itineraryToResult(it, query))
 
