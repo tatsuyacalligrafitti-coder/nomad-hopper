@@ -14,20 +14,51 @@ const MODE_HINTS: Record<SearchMode, string> = {
   fastest: '最も早く到着する便を探します',
 }
 
+async function fetchFlights(query: SearchQuery): Promise<CategorizedFlights | null> {
+  const res = await fetch('/api/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error)
+  return data.categorized ?? null
+}
+
 export default function HomePage() {
   const [categorized, setCategorized] = useState<CategorizedFlights | null>(null)
+  const [baseCategorized, setBaseCategorized] = useState<CategorizedFlights | null>(null)
   const [mode, setMode] = useState<SearchMode>('price')
   const [isLoading, setIsLoading] = useState(false)
+  const [elegantLoading, setElegantLoading] = useState(false)
   const [error, setError] = useState('')
   const [searched, setSearched] = useState(false)
   const [lastQuery, setLastQuery] = useState<SearchQuery | null>(null)
 
   const searchBarRef = useRef<SearchBarHandle>(null)
 
-  const handleModeChange = (newMode: SearchMode) => {
+  const handleModeChange = async (newMode: SearchMode) => {
+    const prevMode = mode
     setMode(newMode)
-    if (!searched) {
+
+    if (!searched || !lastQuery) {
       searchBarRef.current?.focus()
+      return
+    }
+
+    if (newMode === 'elegant') {
+      setElegantLoading(true)
+      setError('')
+      try {
+        const results = await fetchFlights({ ...lastQuery, cabinClass: 'business' })
+        setCategorized(results)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '検索に失敗しました')
+      } finally {
+        setElegantLoading(false)
+      }
+    } else if (prevMode === 'elegant' && baseCategorized) {
+      setCategorized(baseCategorized)
     }
   }
 
@@ -35,20 +66,15 @@ export default function HomePage() {
     setIsLoading(true)
     setError('')
     setSearched(true)
+    setLastQuery(query)
 
     const searchQuery: SearchQuery =
       mode === 'elegant' ? { ...query, cabinClass: 'business' } : query
-    setLastQuery(searchQuery)
 
     try {
-      const res = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setCategorized(data.categorized ?? null)
+      const results = await fetchFlights(searchQuery)
+      setCategorized(results)
+      if (mode !== 'elegant') setBaseCategorized(results)
     } catch (err) {
       setError(err instanceof Error ? err.message : '検索に失敗しました')
       setCategorized(null)
@@ -110,10 +136,11 @@ export default function HomePage() {
         {searched && (
           <FlightResults
             categorized={categorized}
-            isLoading={isLoading}
+            isLoading={isLoading || elegantLoading}
             error={error}
             query={lastQuery}
             mode={mode}
+            loadingMessage={elegantLoading || (isLoading && mode === 'elegant') ? 'ビジネスクラスを検索中...' : undefined}
           />
         )}
 

@@ -10,6 +10,7 @@ interface Props {
   error?: string
   query?: SearchQuery | null
   mode?: string
+  loadingMessage?: string
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -237,7 +238,7 @@ function Skeleton() {
 }
 
 // ─── Main export ───────────────────────────────────────────────────────────────
-export default function FlightResults({ categorized, isLoading, error, query, mode }: Props) {
+export default function FlightResults({ categorized, isLoading, error, query, mode, loadingMessage }: Props) {
   const hasQuery = !!(query?.origin && query?.destination && query?.departureDate)
   const hasResults = !!(
     categorized &&
@@ -267,7 +268,14 @@ export default function FlightResults({ categorized, isLoading, error, query, mo
       )}
 
       {isLoading ? (
-        <Skeleton />
+        <>
+          {loadingMessage && (
+            <p className="text-center text-amber-600 font-semibold text-sm py-2">
+              ✈️ {loadingMessage}
+            </p>
+          )}
+          <Skeleton />
+        </>
       ) : !hasResults ? (
         <div className="text-center py-16 text-gray-400">
           <Plane size={48} className="mx-auto mb-3 opacity-30" />
