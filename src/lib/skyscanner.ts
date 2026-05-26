@@ -96,8 +96,12 @@ function itineraryToResult(
   query: SearchQuery,
 ): FlightResult {
   const outbound = it.legs[0]
-  // Use all leg durations for total (outbound only for display consistency)
   const segments: FlightSegment[] = it.legs.map(legToSegment)
+
+  // Prefer API-provided stopCount; fall back to segment count - 1 (more reliable)
+  const stops = outbound
+    ? (outbound.stopCount ?? Math.max(0, outbound.segments.length - 1))
+    : 0
 
   return {
     id: `ss-${it.id}`,
@@ -106,7 +110,7 @@ function itineraryToResult(
     totalDuration: outbound?.durationInMinutes ?? 0,
     segments,
     cabinClass: query.cabinClass,
-    stops: outbound?.stopCount ?? 0,
+    stops,
     baggageIncluded: false,
     bookingLink: aviasalesLink(
       query.origin,
@@ -173,5 +177,18 @@ export async function searchSkyscanner(query: SearchQuery): Promise<FlightResult
   const json = await res.json() as { data?: { itineraries?: SkyItinerary[] } }
   const itineraries = json.data?.itineraries ?? []
 
-  return itineraries.map((it) => itineraryToResult(it, query))
+  const results = itineraries.map((it) => itineraryToResult(it, query))
+
+  // Deduplicate: same carrier + flight number (or departure time) = same flight
+  const seen = new Set<string>()
+  return results.filter((r) => {
+    const seg = r.segments[0]
+    if (!seg) return true
+    const key = seg.flightNumber
+      ? `${seg.carrierCode}-${seg.flightNumber}`
+      : `${seg.carrierCode}-${seg.departingAt}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
