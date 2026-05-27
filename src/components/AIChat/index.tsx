@@ -14,12 +14,35 @@ interface Props {
   categorized: CategorizedFlights | null
 }
 
-const SUGGESTIONS = [
-  '直行便と乗り継ぎどっちがいい？',
-  'マイルで無料にする方法は？',
-  'バンコクのベストシーズンは？',
-  '最安値を見つけるコツは？',
+const DEFAULT_SUGGESTIONS = [
+  '直行便と乗り継ぎ、どっちがお得？',
+  'マイルで航空券を無料にする方法は？',
+  '今の価格は安い？高い？',
+  'おすすめの旅行先を提案して',
 ]
+
+function getDestLabel(query: SearchQuery | null, categorized: CategorizedFlights | null): string {
+  // Prefer human-readable city name from flight results
+  const firstFlight =
+    categorized?.cheapest[0] ??
+    categorized?.cheapestDirect[0] ??
+    categorized?.recommended[0]
+  const name = firstFlight?.segments[0]?.destinationName
+  if (name) return name
+  // Fall back to destination IATA code
+  return query?.destination ?? ''
+}
+
+function getSuggestions(query: SearchQuery | null, categorized: CategorizedFlights | null): string[] {
+  if (!query?.destination) return DEFAULT_SUGGESTIONS
+  const destLabel = getDestLabel(query, categorized)
+  return [
+    'この価格は今買い時？',
+    '直行便と乗り継ぎ、どっちがおすすめ？',
+    `${destLabel}旅行のベストシーズンは？`,
+    'マイルで行く方法は？',
+  ]
+}
 
 function TypingDots() {
   return (
@@ -132,7 +155,7 @@ export default function AIChat({ query, categorized }: Props) {
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {SUGGESTIONS.map((s) => (
+                {getSuggestions(query, categorized).map((s) => (
                   <button
                     key={s}
                     onClick={() => send(s)}
