@@ -59,12 +59,30 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
     }, 500)
   }, [rawQuery])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    // Use debounced parsed state, or fall back to synchronous parse on submit
-    const p = parsed ?? parseSearchQuery(rawQuery)
+    // Use debounced parsed state if available, otherwise call the API directly.
+    // Never fall back to the client-side parser alone — it lacks the airport DB.
+    let p = parsed
+    if (!p || !p.origin || !p.destination || !p.departureDate) {
+      setIsParsing(true)
+      try {
+        const res = await fetch('/api/parse-query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: rawQuery }),
+        })
+        const data = await res.json()
+        setParsed(data)
+        p = data
+      } catch {
+        // fall through to show error below
+      } finally {
+        setIsParsing(false)
+      }
+    }
 
     if (!p?.origin) {
       setError('出発地を認識できませんでした（例: 東京から、HND）')

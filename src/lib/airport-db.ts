@@ -53,6 +53,7 @@ const COUNTRY_NAME_TO_ISO: Record<string, string> = {
   ガーナ: 'GH',
   ナイジェリア: 'NG',
   // ── 東南アジア ──────────────────────────────────
+  インドネシア: 'ID',
   フィリピン: 'PH',
   ベトナム: 'VN',
   カンボジア: 'KH',
@@ -126,6 +127,7 @@ const COUNTRY_NAME_TO_ISO: Record<string, string> = {
   ethiopia: 'ET',
   ghana: 'GH',
   nigeria: 'NG',
+  indonesia: 'ID',
   philippines: 'PH',
   vietnam: 'VN',
   cambodia: 'KH',
@@ -190,8 +192,8 @@ const COUNTRY_PREFERRED: Record<string, string> = {
   JP: 'HND', US: 'JFK', GB: 'LHR', FR: 'CDG', DE: 'FRA',
   NL: 'AMS', IT: 'FCO', ES: 'MAD', AU: 'SYD', CN: 'PEK',
   HK: 'HKG', TW: 'TPE', KR: 'ICN', TH: 'BKK', SG: 'SIN',
-  MY: 'KUL', ID: 'CGK', PH: 'MNL', VN: 'SGN', KH: 'PNH',
-  MM: 'RGN', LA: 'VTE', IN: 'DEL', PK: 'KHI', LK: 'CMB',
+  MY: 'KUL', ID: 'CGK', PH: 'MNL', VN: 'SGN', KH: 'PNH', MM: 'RGN',
+  LA: 'VTE', IN: 'DEL', PK: 'KHI', LK: 'CMB',
   NP: 'KTM', MV: 'MLE', AE: 'DXB', SA: 'RUH', QA: 'DOH',
   KW: 'KWI', BH: 'BAH', OM: 'MCT', JO: 'AMM', IL: 'TLV',
   TR: 'IST', KE: 'NBO', EG: 'CAI', MA: 'CMN', ZA: 'JNB',
@@ -204,6 +206,11 @@ const COUNTRY_PREFERRED: Record<string, string> = {
   BE: 'BRU', CH: 'ZRH', AT: 'VIE',
 }
 
+// ── Country name entries sorted longest-first (prevents 'インド' matching before 'インドネシア') ──
+const COUNTRY_NAME_ENTRIES = Object.entries(COUNTRY_NAME_TO_ISO).sort(
+  ([a], [b]) => b.length - a.length
+)
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -212,8 +219,10 @@ const COUNTRY_PREFERRED: Record<string, string> = {
  *
  * Priority:
  * 1. City name exact match
- * 2. Airport name partial match
- * 3. Country name (Japanese or English) → preferred airport for that country
+ * 2. City name substring match
+ * 3. Airport name partial match
+ * 4. Country name exact match
+ * 5. Country name substring match (handles particles: "ケニアへ", "フィリピンへ行く", etc.)
  */
 export function resolveFromDB(fragment: string): string | null {
   const lower = fragment.trim().toLowerCase()
@@ -234,10 +243,12 @@ export function resolveFromDB(fragment: string): string | null {
     }
   }
 
-  // 4. Country name lookup
-  const iso = COUNTRY_NAME_TO_ISO[lower] ?? COUNTRY_NAME_TO_ISO[fragment.trim()]
-  if (iso) {
-    return COUNTRY_PREFERRED[iso] ?? countryIndex.get(iso)?.[0] ?? null
+  // 4 & 5. Country name: exact then substring (longest names checked first)
+  for (const [countryName, iso] of COUNTRY_NAME_ENTRIES) {
+    const cn = countryName.toLowerCase()
+    if (lower === cn || lower.includes(cn)) {
+      return COUNTRY_PREFERRED[iso] ?? countryIndex.get(iso)?.[0] ?? null
+    }
   }
 
   return null
