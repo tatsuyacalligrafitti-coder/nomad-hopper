@@ -15,10 +15,10 @@ interface Props {
 }
 
 const DEFAULT_SUGGESTIONS = [
-  '直行便と乗り継ぎ、どっちがお得？',
-  'マイルで航空券を無料にする方法は？',
-  '今の価格は安い？高い？',
-  'おすすめの旅行先を提案して',
+  'Nomad Hopperの使い方を教えて',
+  '航空券を安く買う基本的なコツは？',
+  'マイルとは？陸マイラーとは？',
+  'ビジネスクラスとエコノミーの違いは？',
 ]
 
 function getDestLabel(query: SearchQuery | null, categorized: CategorizedFlights | null): string {

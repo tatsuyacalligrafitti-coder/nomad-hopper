@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Sparkles, Loader2 } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Sparkles, Loader2, Send } from 'lucide-react'
 import type { CategorizedFlights, SearchQuery } from '@/types'
 
 interface AnalysisResult {
@@ -9,6 +9,11 @@ interface AnalysisResult {
   reason: string
   recommended: string
   caution: string | null
+}
+
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
 }
 
 interface Props {
@@ -37,14 +42,46 @@ const VERDICT_STYLES: Record<string, { emoji: string; textColor: string; cardBg:
   },
 }
 
+const CHAT_SUGGESTIONS = [
+  'なぜこの判定なの？',
+  'もっと安くする方法は？',
+  'いつ買うのがベスト？',
+  'この便のメリット・デメリットは？',
+]
+
+function TypingDots() {
+  return (
+    <div className="flex items-center gap-1 px-3 py-2">
+      {[0, 150, 300].map((delay) => (
+        <span
+          key={delay}
+          className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"
+          style={{ animationDelay: `${delay}ms` }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export default function AIAnalysis({ categorized, query }: Props) {
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const chatEndRef = useRef<HTMLDivElement>(null)
+  const chatInputRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages, chatLoading])
+
   const analyze = async () => {
     setLoading(true)
     setError('')
+    setChatMessages([])
     try {
       const res = await fetch('/api/ai-analysis', {
         method: 'POST',
@@ -58,6 +95,43 @@ export default function AIAnalysis({ categorized, query }: Props) {
       setError(err instanceof Error ? err.message : 'AI分析に失敗しました')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const sendChat = async (text?: string) => {
+    if (!result) return
+    const content = (text ?? chatInput).trim()
+    if (!content || chatLoading) return
+
+    const userMsg: ChatMessage = { role: 'user', content }
+    const next = [...chatMessages, userMsg]
+    setChatMessages(next)
+    setChatInput('')
+    setChatLoading(true)
+
+    try {
+      const res = await fetch('/api/ai-analysis-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: next, query, categorized, analysis: result }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'エラーが発生しました')
+      setChatMessages([...next, { role: 'assistant', content: data.content }])
+    } catch (err) {
+      setChatMessages([...next, {
+        role: 'assistant',
+        content: err instanceof Error ? err.message : 'エラーが発生しました。もう一度お試しください。',
+      }])
+    } finally {
+      setChatLoading(false)
+    }
+  }
+
+  const handleChatKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault()
+      sendChat()
     }
   }
 
@@ -106,7 +180,7 @@ export default function AIAnalysis({ categorized, query }: Props) {
               <span className="text-sm font-bold text-indigo-700">AI価格分析</span>
             </div>
             <button
-              onClick={() => { setResult(null); setError('') }}
+              onClick={() => { setResult(null); setError(''); setChatMessages([]) }}
               className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
             >
               閉じる
@@ -143,6 +217,77 @@ export default function AIAnalysis({ categorized, query }: Props) {
             {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
             再分析する
           </button>
+
+          {/* Inline chat */}
+          <div className="border-t border-indigo-200 pt-4 space-y-3">
+            <p className="text-xs font-semibold text-indigo-600">この分析についてさらに質問する</p>
+
+            {chatMessages.length === 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                {CHAT_SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => sendChat(s)}
+                    disabled={chatLoading}
+                    className="text-xs text-left text-indigo-700 bg-white hover:bg-indigo-100 border border-indigo-200 rounded-xl px-3 py-2 transition-colors leading-snug disabled:opacity-50"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {chatMessages.length > 0 && (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {chatMessages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={[
+                        'max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap',
+                        msg.role === 'user'
+                          ? 'bg-indigo-600 text-white rounded-br-sm'
+                          : 'bg-white text-gray-800 rounded-bl-sm border border-indigo-100',
+                      ].join(' ')}
+                    >
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-white border border-indigo-100 rounded-2xl rounded-bl-sm">
+                      <TypingDots />
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <textarea
+                ref={chatInputRef}
+                rows={1}
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={handleChatKeyDown}
+                placeholder="質問を入力（Shift+Enterで改行）"
+                disabled={chatLoading}
+                className="flex-1 text-xs border border-indigo-200 rounded-xl px-3 py-2 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-gray-50 transition-all resize-none leading-relaxed bg-white"
+              />
+              <button
+                onClick={() => sendChat()}
+                disabled={!chatInput.trim() || chatLoading}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-3 py-2 disabled:opacity-40 transition-colors shrink-0"
+                aria-label="送信"
+              >
+                <Send size={13} />
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
