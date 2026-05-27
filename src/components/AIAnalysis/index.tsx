@@ -71,11 +71,12 @@ export default function AIAnalysis({ categorized, query }: Props) {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
-  const chatEndRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = chatContainerRef.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [chatMessages, chatLoading])
 
   const analyze = async () => {
@@ -238,7 +239,7 @@ export default function AIAnalysis({ categorized, query }: Props) {
             )}
 
             {chatMessages.length > 0 && (
-              <div className="space-y-2 max-h-60 overflow-y-auto">
+              <div ref={chatContainerRef} className="space-y-2 max-h-60 overflow-y-auto">
                 {chatMessages.map((msg, i) => (
                   <div
                     key={i}
@@ -263,7 +264,6 @@ export default function AIAnalysis({ categorized, query }: Props) {
                     </div>
                   </div>
                 )}
-                <div ref={chatEndRef} />
               </div>
             )}
 
