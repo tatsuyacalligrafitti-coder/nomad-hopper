@@ -43,10 +43,10 @@ const VERDICT_STYLES: Record<string, { emoji: string; textColor: string; cardBg:
 }
 
 const CHAT_SUGGESTIONS = [
-  'なぜこの判定なの？',
-  'もっと安くする方法は？',
-  'いつ買うのがベスト？',
-  'この便のメリット・デメリットは？',
+  '乗り継ぎ空港はどこ？待ち時間は？',
+  'この時期より安くなる日程はある？',
+  '荷物の預け入れ料金は含まれてる？',
+  'マイルで行く場合いくら必要？',
 ]
 
 function TypingDots() {
