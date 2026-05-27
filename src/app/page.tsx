@@ -6,6 +6,7 @@ import SearchBar, { type SearchBarHandle } from '@/components/SearchBar'
 import ModeSelector from '@/components/ModeSelector'
 import FlightResults from '@/components/FlightResults'
 import AIAnalysis from '@/components/AIAnalysis'
+import AIChat from '@/components/AIChat'
 import type { CategorizedFlights, SearchMode, SearchQuery } from '@/types'
 
 const MODE_HINTS: Record<SearchMode, string> = {
@@ -159,6 +160,9 @@ export default function HomePage() {
       <footer className="text-center text-xs text-gray-400 py-6 border-t border-gray-100 mt-4">
         2025 Nomad Hopper · Powered by Travelpayouts
       </footer>
+
+      {/* AI Chat — fixed position, always rendered */}
+      <AIChat query={lastQuery} categorized={categorized} />
     </div>
   )
 }
