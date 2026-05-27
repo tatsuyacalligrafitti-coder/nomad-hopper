@@ -5,6 +5,7 @@ import { Plane } from 'lucide-react'
 import SearchBar, { type SearchBarHandle } from '@/components/SearchBar'
 import ModeSelector from '@/components/ModeSelector'
 import FlightResults from '@/components/FlightResults'
+import AIAnalysis from '@/components/AIAnalysis'
 import type { CategorizedFlights, SearchMode, SearchQuery } from '@/types'
 
 const MODE_HINTS: Record<SearchMode, string> = {
@@ -131,6 +132,15 @@ export default function HomePage() {
           onSearch={handleSearch}
           isLoading={isLoading}
         />
+
+        {/* AI Analysis */}
+        {searched && !isLoading && !elegantLoading && categorized && lastQuery && (
+          categorized.cheapest.length > 0 ||
+          categorized.cheapestDirect.length > 0 ||
+          categorized.recommended.length > 0
+        ) && (
+          <AIAnalysis categorized={categorized} query={lastQuery} />
+        )}
 
         {/* Results */}
         {searched && (
