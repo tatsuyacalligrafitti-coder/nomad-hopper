@@ -64,7 +64,7 @@ export default function AIChat({ query, categorized }: Props) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -105,8 +105,8 @@ export default function AIChat({ query, categorized }: Props) {
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       send()
     }
@@ -199,15 +199,15 @@ export default function AIChat({ query, categorized }: Props) {
 
         {/* Input */}
         <div className="border-t border-gray-100 p-3 flex gap-2 shrink-0 bg-white">
-          <input
+          <textarea
             ref={inputRef}
-            type="text"
+            rows={1}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="旅行について何でも聞いてください"
+            placeholder={"旅行について何でも聞いてください\nShift+Enterで改行"}
             disabled={loading}
-            className="flex-1 text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-gray-50 transition-all"
+            className="flex-1 text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-gray-50 transition-all resize-none leading-relaxed"
           />
           <button
             onClick={() => send()}
