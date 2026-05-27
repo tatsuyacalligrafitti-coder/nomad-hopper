@@ -14,6 +14,7 @@ interface AnalysisResult {
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+  suggestions?: string[]
 }
 
 interface Props {
@@ -118,7 +119,11 @@ export default function AIAnalysis({ categorized, query }: Props) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'エラーが発生しました')
-      setChatMessages([...next, { role: 'assistant', content: data.content }])
+      setChatMessages([...next, {
+        role: 'assistant',
+        content: data.content,
+        suggestions: data.suggestions ?? [],
+      }])
     } catch (err) {
       setChatMessages([...next, {
         role: 'assistant',
@@ -240,23 +245,40 @@ export default function AIAnalysis({ categorized, query }: Props) {
 
             {chatMessages.length > 0 && (
               <div ref={chatContainerRef} className="space-y-2 max-h-60 overflow-y-auto">
-                {chatMessages.map((msg, i) => (
-                  <div
-                    key={i}
-                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={[
-                        'max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap',
-                        msg.role === 'user'
-                          ? 'bg-indigo-600 text-white rounded-br-sm'
-                          : 'bg-white text-gray-800 rounded-bl-sm border border-indigo-100',
-                      ].join(' ')}
-                    >
-                      {msg.content}
+                {chatMessages.map((msg, i) => {
+                  const isLastAssistant =
+                    msg.role === 'assistant' && i === chatMessages.length - 1 && !chatLoading
+                  return (
+                    <div key={i} className="space-y-1.5">
+                      <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div
+                          className={[
+                            'max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap',
+                            msg.role === 'user'
+                              ? 'bg-indigo-600 text-white rounded-br-sm'
+                              : 'bg-white text-gray-800 rounded-bl-sm border border-indigo-100',
+                          ].join(' ')}
+                        >
+                          {msg.content}
+                        </div>
+                      </div>
+                      {isLastAssistant && msg.suggestions && msg.suggestions.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pl-1">
+                          {msg.suggestions.map((s) => (
+                            <button
+                              key={s}
+                              onClick={() => sendChat(s)}
+                              disabled={chatLoading}
+                              className="text-xs text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-200 rounded-xl px-2.5 py-1 transition-colors leading-snug disabled:opacity-50"
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
                 {chatLoading && (
                   <div className="flex justify-start">
                     <div className="bg-white border border-indigo-100 rounded-2xl rounded-bl-sm">

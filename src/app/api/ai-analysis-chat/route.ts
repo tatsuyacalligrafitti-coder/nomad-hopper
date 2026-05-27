@@ -51,7 +51,10 @@ ${priceLines}
 理由: ${analysis.reason}
 おすすめの便: ${analysis.recommended}${analysis.caution ? `\n注意点: ${analysis.caution}` : ''}
 
-返答は簡潔で親しみやすいトーンで。`
+【出力形式】
+必ず以下のJSON形式のみで返してください。回答本文と、ユーザーが次に聞きたくなりそうな具体的な質問を2〜3個提案してください：
+{"answer": "回答テキスト", "suggestions": ["次の質問1", "次の質問2", "次の質問3"]}
+suggestionsは会話の流れに沿った具体的な質問にしてください。余分なテキストは一切出力しないでください。`
 }
 
 export async function POST(request: NextRequest) {
@@ -93,6 +96,20 @@ export async function POST(request: NextRequest) {
   }
 
   const data = await claudeRes.json()
-  const content: string = data.content?.[0]?.text ?? ''
-  return Response.json({ content })
+  const text: string = data.content?.[0]?.text ?? ''
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/)
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]) as { answer?: string; suggestions?: string[] }
+      return Response.json({
+        content: parsed.answer ?? text,
+        suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
+      })
+    } catch {
+      // fall through to plain text response
+    }
+  }
+
+  return Response.json({ content: text, suggestions: [] })
 }
