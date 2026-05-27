@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'ANTHROPIC_API_KEY is not configured' }, { status: 500 })
   }
 
-  const trimmed = messages.slice(-20)
+  const apiMessages = messages.slice(-20).map(({ role, content }) => ({ role, content }))
 
   const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: buildSystemPrompt(query, categorized, analysis),
-      messages: trimmed,
+      messages: apiMessages,
     }),
   })
 
