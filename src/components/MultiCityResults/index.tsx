@@ -9,6 +9,7 @@ import type { MultiCitySearchResult } from '@/types'
 interface MultiCityAnalysis {
   verdict: string
   reason: string
+  recommended?: string
   tip: string | null
 }
 
@@ -50,10 +51,10 @@ function getCityLabel(iata: string, cityFromApi: string | undefined): string {
   return IATA_JP_NAMES[iata.toUpperCase()] ?? cityFromApi ?? iata
 }
 
-function verdictColor(verdict: string): string {
-  if (verdict.startsWith('◎')) return 'text-green-700 bg-green-50 border-green-200'
-  if (verdict.startsWith('△')) return 'text-amber-700 bg-amber-50 border-amber-200'
-  return 'text-red-700 bg-red-50 border-red-200'
+const VERDICT_STYLES: Record<string, { emoji: string; textColor: string; cardBg: string; cardBorder: string }> = {
+  '◎今すぐ':  { emoji: '🟢', textColor: 'text-green-700',  cardBg: 'bg-green-50',  cardBorder: 'border-green-200' },
+  '△様子見':  { emoji: '🟡', textColor: 'text-amber-700',  cardBg: 'bg-amber-50',  cardBorder: 'border-amber-200' },
+  '✗待つべき': { emoji: '🔴', textColor: 'text-red-700',    cardBg: 'bg-red-50',    cardBorder: 'border-red-200' },
 }
 
 function TypingDots() {
@@ -192,6 +193,11 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
     'この予算でどこか追加できる？',
   ]
 
+  // ── Verdict style (computed once; safe because analysis may be null) ─────────
+  const vs = analysis
+    ? (VERDICT_STYLES[analysis.verdict] ?? VERDICT_STYLES['△様子見'])
+    : null
+
   // ── City nodes for timeline ───────────────────────────────────────────────────
   const cityNodes: Array<{ iata: string; cityFromApi?: string }> = [
     { iata: result.segments[0].origin, cityFromApi: result.segments[0].originCity },
@@ -325,33 +331,63 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
         )}
 
         {/* AI analysis result + inline chat */}
-        {analysis && (
-          <div className="mt-4 rounded-xl border border-gray-200 overflow-hidden">
-            {/* Verdict + reason + tip */}
-            <div className={`p-4 space-y-3 ${verdictColor(analysis.verdict)}`}>
+        {analysis && vs && (
+          <div className="mt-4 rounded-2xl border border-indigo-200 overflow-hidden">
+            {/* Analysis card */}
+            <div className="bg-indigo-50 p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Sparkles size={14} className="shrink-0" />
-                  <span className="font-extrabold text-base">{analysis.verdict}</span>
+                  <Sparkles size={15} className="text-indigo-600" />
+                  <span className="text-sm font-bold text-indigo-700">AI価格分析</span>
                 </div>
                 <button
                   onClick={() => { setAnalysis(null); setAnalysisError(''); setChatMessages([]) }}
-                  className="text-xs opacity-60 hover:opacity-100 underline"
+                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  再分析する
+                  閉じる
                 </button>
               </div>
-              <p className="text-sm leading-relaxed">{analysis.reason}</p>
-              {analysis.tip && (
-                <div className="rounded-lg bg-white/60 border border-current/20 px-3 py-2">
-                  <p className="text-xs font-semibold mb-0.5">💡 提案</p>
-                  <p className="text-xs leading-relaxed">{analysis.tip}</p>
+
+              {/* Verdict badge */}
+              <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${vs.cardBg} ${vs.cardBorder}`}>
+                <span className="text-2xl leading-none">{vs.emoji}</span>
+                <span className={`text-lg font-extrabold ${vs.textColor}`}>{analysis.verdict}</span>
+              </div>
+
+              {/* Reason */}
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">判断理由</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{analysis.reason}</p>
+              </div>
+
+              {/* Recommended */}
+              {analysis.recommended && (
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">✈️ おすすめの組み合わせ</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">{analysis.recommended}</p>
                 </div>
               )}
+
+              {/* Tip */}
+              {analysis.tip && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">
+                  <p className="text-xs font-semibold text-amber-700">💡 改善提案</p>
+                  <p className="text-sm text-amber-800 leading-relaxed">{analysis.tip}</p>
+                </div>
+              )}
+
+              <button
+                onClick={handleAnalyze}
+                disabled={isAnalyzing}
+                className="flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors disabled:opacity-50"
+              >
+                {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                再分析する
+              </button>
             </div>
 
             {/* Inline chat */}
-            <div className="bg-gray-50 border-t border-gray-200 p-4 space-y-3">
+            <div className="bg-gray-50 border-t border-indigo-200 p-4 space-y-3">
               <p className="text-xs font-semibold text-gray-600">この旅程についてさらに質問する</p>
 
               {/* Initial suggestions */}

@@ -7,17 +7,27 @@ function buildSystemPrompt(): string {
   })
   return `今日の日付は${today}です。
 
-あなたはマルチシティ航空旅程の価格分析専門家です。提供された旅程データを分析し、日本語でJSON形式のみで回答してください：
+あなたは航空券の価格分析の専門家です。以下のマルチシティ旅程データを分析して日本語で答えてください。必ずJSON形式のみで回答してください：
 
 {
   "verdict": "◎今すぐ",
   "reason": "全体的な価格評価と買い時の判断を2〜3文で",
-  "tip": "旅程改善の提案（例:「逆ルートの方が安い可能性があります」「区間2の出発日を数日ずらすと安くなる場合があります」など。提案がない場合はnull）"
+  "recommended": "最もおすすめの区間の組み合わせや乗り方を具体的に説明",
+  "tip": "具体的な改善提案（逆ルート・日程変更・航空会社変更など。提案がない場合はnull）"
 }
 
 verdictは必ず「◎今すぐ」「△様子見」「✗待つべき」のいずれかにしてください。
-国際線の一般的な相場（例：東京↔バンコク往復6〜12万円、バンコク↔ナイロビ片道5〜15万円など）と比較して総合評価してください。
-便が見つからなかった区間があっても、見つかった区間の価格を元に判断してください。`
+
+各区間の相場知識も活用して判断してください：
+- 東京↔バンコク エコノミー往復：6〜12万円、ビジネス：20〜40万円
+- 東京↔ナイロビ エコノミー往復：20〜35万円
+- 東京↔ロンドン エコノミー往復：10〜18万円、ビジネス：40〜80万円
+- バンコク↔ナイロビ エコノミー片道：5〜15万円
+- バンコク↔ロンドン エコノミー片道：5〜12万円
+- シンガポール↔欧州 エコノミー片道：5〜10万円
+- 東京↔ニューヨーク エコノミー往復：12〜22万円
+
+逆ルートの可能性、滞在日数の調整、エチオピア航空・カタール航空・エミレーツ航空などの代替航空会社も提案してください。`
 }
 
 interface RequestBody {
@@ -47,10 +57,12 @@ export async function POST(request: NextRequest) {
     const lines = [`区間${i + 1}: ${seg.origin} → ${seg.destination}（${seg.date}出発）`]
     if (seg.cheapestPrice !== null && seg.cheapestFlight) {
       const carrier = seg.cheapestFlight.segments[0]?.carrierName ?? ''
+      const stops = seg.cheapestFlight.stops
       const dur = seg.cheapestFlight.totalDuration
       lines.push(`  最安値: ¥${Math.round(seg.cheapestPrice).toLocaleString()}`)
       if (carrier) lines.push(`  航空会社: ${carrier}`)
       if (dur > 0) lines.push(`  所要時間: ${formatDuration(dur)}`)
+      lines.push(`  乗り継ぎ: ${stops === 0 ? '直行' : `${stops}回`}`)
     } else {
       lines.push('  便が見つかりませんでした')
     }
@@ -58,14 +70,14 @@ export async function POST(request: NextRequest) {
   })
 
   const userMessage = [
-    'マルチシティ旅程の分析をお願いします。',
+    'マルチシティ旅程の価格分析をお願いします。',
     '',
     ...segLines,
     '',
     `合計金額: ¥${Math.round(result.totalPrice).toLocaleString()}`,
     `区間数: ${result.segments.length}`,
     '',
-    'この旅程の買い時を評価し、改善提案があればお知らせください。',
+    'この旅程の買い時を評価し、おすすめの乗り方と改善提案をお願いします。',
   ].join('\n')
 
   const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -77,7 +89,7 @@ export async function POST(request: NextRequest) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 800,
+      max_tokens: 1000,
       system: buildSystemPrompt(),
       messages: [{ role: 'user', content: userMessage }],
     }),
