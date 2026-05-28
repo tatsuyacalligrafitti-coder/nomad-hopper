@@ -140,7 +140,21 @@ export default function HomePage() {
           categorized.cheapestDirect.length > 0 ||
           categorized.recommended.length > 0
         ) && (
-          <AIAnalysis categorized={categorized} query={lastQuery} />
+          <AIAnalysis
+            categorized={categorized}
+            query={lastQuery}
+            onReSearch={(q) => {
+              handleSearch({
+                origin: q.origin,
+                destination: q.destination,
+                departureDate: q.departureDate,
+                returnDate: q.returnDate,
+                passengers: lastQuery.passengers,
+                cabinClass: lastQuery.cabinClass,
+                rawQuery: `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`,
+              })
+            }}
+          />
         )}
 
         {/* Results */}

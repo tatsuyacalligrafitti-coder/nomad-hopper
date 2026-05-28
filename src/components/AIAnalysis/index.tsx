@@ -11,15 +11,26 @@ interface AnalysisResult {
   caution: string | null
 }
 
+interface SearchSuggestion {
+  show: boolean
+  origin: string
+  destination: string
+  departureDate: string
+  returnDate?: string | null
+  label: string
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   suggestions?: string[]
+  searchSuggestion?: SearchSuggestion | null
 }
 
 interface Props {
   categorized: CategorizedFlights
   query: SearchQuery
+  onReSearch: (q: { origin: string; destination: string; departureDate: string; returnDate?: string }) => void
 }
 
 const VERDICT_STYLES: Record<string, { emoji: string; textColor: string; cardBg: string; cardBorder: string }> = {
@@ -64,7 +75,7 @@ function TypingDots() {
   )
 }
 
-export default function AIAnalysis({ categorized, query }: Props) {
+export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -124,6 +135,7 @@ export default function AIAnalysis({ categorized, query }: Props) {
         role: 'assistant',
         content: data.content,
         suggestions: data.suggestions ?? [],
+        searchSuggestion: data.searchSuggestion ?? null,
       }])
     } catch (err) {
       setChatMessages([...next, {
@@ -275,6 +287,25 @@ export default function AIAnalysis({ categorized, query }: Props) {
                               {s}
                             </button>
                           ))}
+                        </div>
+                      )}
+                      {isLastAssistant && msg.searchSuggestion && (
+                        <div className="pl-1">
+                          <button
+                            onClick={() => {
+                              const s = msg.searchSuggestion!
+                              setResult(null)
+                              onReSearch({
+                                origin: s.origin,
+                                destination: s.destination,
+                                departureDate: s.departureDate,
+                                ...(s.returnDate ? { returnDate: s.returnDate } : {}),
+                              })
+                            }}
+                            className="flex items-center gap-1.5 text-sm text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-300 rounded-xl px-4 py-2 transition-colors font-medium"
+                          >
+                            ✈️ {msg.searchSuggestion.label}
+                          </button>
                         </div>
                       )}
                     </div>

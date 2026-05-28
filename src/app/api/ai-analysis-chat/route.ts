@@ -55,9 +55,21 @@ ${priceLines}
 おすすめの便: ${analysis.recommended}${analysis.caution ? `\n注意点: ${analysis.caution}` : ''}
 
 【出力形式】
-必ず以下のJSON形式のみで返してください。回答本文と、ユーザーが次に聞きたくなりそうな具体的な質問を2〜3個提案してください：
-{"answer": "回答テキスト", "suggestions": ["次の質問1", "次の質問2", "次の質問3"]}
-suggestionsは会話の流れに沿った具体的な質問にしてください。余分なテキストは一切出力しないでください。`
+必ず以下のJSON形式のみで返してください。余分なテキストは一切出力しないでください：
+{
+  "answer": "回答テキスト",
+  "suggestions": ["次の質問1", "次の質問2"],
+  "searchSuggestion": null
+}
+
+suggestionsは会話の流れに沿った具体的な質問を2〜3個。
+
+searchSuggestionについて：
+- 回答の中で「○月○日出発だと安い」「○月に変更を」など具体的な日程・条件の変更を提案する場合は、以下の形式で値を入れてください：
+  {"show": true, "origin": "HND", "destination": "NBO", "departureDate": "2026-09-20", "returnDate": "2026-09-27", "label": "9月20日出発で再検索する"}
+- returnDateが不要な場合はnullにしてください。
+- 条件変更の提案がない場合はsearchSuggestion: nullにしてください。
+- 提案する日付が不明な場合は現在の検索条件をそのまま使用してください。`
 }
 
 export async function POST(request: NextRequest) {
@@ -104,15 +116,27 @@ export async function POST(request: NextRequest) {
   const jsonMatch = text.match(/\{[\s\S]*\}/)
   if (jsonMatch) {
     try {
-      const parsed = JSON.parse(jsonMatch[0]) as { answer?: string; suggestions?: string[] }
+      const parsed = JSON.parse(jsonMatch[0]) as {
+        answer?: string
+        suggestions?: string[]
+        searchSuggestion?: {
+          show: boolean
+          origin: string
+          destination: string
+          departureDate: string
+          returnDate?: string | null
+          label: string
+        } | null
+      }
       return Response.json({
         content: parsed.answer ?? text,
         suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
+        searchSuggestion: parsed.searchSuggestion?.show ? parsed.searchSuggestion : null,
       })
     } catch {
       // fall through to plain text response
     }
   }
 
-  return Response.json({ content: text, suggestions: [] })
+  return Response.json({ content: text, suggestions: [], searchSuggestion: null })
 }
