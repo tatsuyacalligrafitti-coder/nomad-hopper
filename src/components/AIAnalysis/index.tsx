@@ -311,7 +311,7 @@ export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
                                 ...(s.returnDate ? { returnDate: s.returnDate } : {}),
                               })
                             }}
-                            className="flex items-center gap-1.5 text-sm text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl px-4 py-2 transition-colors font-medium"
+                            className="flex items-center gap-1.5 text-sm text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-300 rounded-xl px-4 py-2 transition-colors font-medium"
                           >
                             ✈️ {msg.searchSuggestion.label}
                           </button>
