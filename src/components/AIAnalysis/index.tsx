@@ -109,6 +109,7 @@ export default function AIAnalysis({ categorized, query }: Props) {
     const next = [...chatMessages, userMsg]
     setChatMessages(next)
     setChatInput('')
+    if (chatInputRef.current) chatInputRef.current.style.height = '44px'
     setChatLoading(true)
 
     try {
@@ -292,9 +293,14 @@ export default function AIAnalysis({ categorized, query }: Props) {
             <div className="flex gap-2">
               <textarea
                 ref={chatInputRef}
-                rows={1}
+                style={{ height: '44px', maxHeight: '200px' }}
                 value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
+                onChange={(e) => {
+                  setChatInput(e.target.value)
+                  const el = e.target
+                  el.style.height = '44px'
+                  el.style.height = Math.min(el.scrollHeight, 200) + 'px'
+                }}
                 onKeyDown={handleChatKeyDown}
                 placeholder="質問を入力（Shift+Enterで改行）"
                 disabled={chatLoading}
