@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   // Each call is an explicit one-way search (no returnDate).
   const results = []
   for (let i = 0; i < segments.length; i++) {
-    if (i > 0) await wait(600)
+    if (i > 0) await wait(1000)
 
     const seg = segments[i]
     const originInfo  = getAirportByIata(seg.origin)
