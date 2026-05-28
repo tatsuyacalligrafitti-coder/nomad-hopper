@@ -264,7 +264,7 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
                           const badgeLabel = estimate ? getPriceBadgeLabel(seg.cheapestPrice!, estimate) : null
                           const badgeColor = estimate ? getPriceBadgeColor(seg.cheapestPrice!, estimate) : null
                           const isExpanded = expandedSegments.has(ci)
-                          const extras = seg.top5Flights.slice(1)
+                          const extras = (seg.top5Flights ?? []).slice(1)
                           return (
                             <>
                               {/* Cheapest flight row */}
