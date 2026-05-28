@@ -34,7 +34,10 @@ function buildSystemPrompt(query: SearchQuery, categorized: CategorizedFlights, 
 
   const cabinLabel = query.cabinClass === 'business' ? 'ビジネスクラス' : 'エコノミー'
 
-  return `あなたはNomad Hopperの旅行AIアシスタントです。
+  const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
+  return `今日の日付は${today}です。
+
+あなたはNomad Hopperの旅行AIアシスタントです。
 以下の検索結果とAI価格分析結果をもとに、ユーザーの質問に日本語で簡潔・親切に答えてください。
 
 --- 検索情報 ---

@@ -1,7 +1,11 @@
 import { NextRequest } from 'next/server'
 import type { CategorizedFlights, SearchQuery } from '@/types'
 
-const SYSTEM_PROMPT = `あなたは航空券の価格分析の専門家です。提供された価格データを分析して以下を日本語で簡潔に答えてください。必ずJSON形式のみで回答してください：
+function buildSystemPrompt(): string {
+  const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
+  return `今日の日付は${today}です。
+
+あなたは航空券の価格分析の専門家です。提供された価格データを分析して以下を日本語で簡潔に答えてください。必ずJSON形式のみで回答してください：
 
 {
   "verdict": "◎今すぐ",
@@ -12,6 +16,7 @@ const SYSTEM_PROMPT = `あなたは航空券の価格分析の専門家です。
 
 verdictは必ず「◎今すぐ」「△様子見」「✗待つべき」のいずれかにしてください。
 東京→バンコクの平均価格帯（エコノミー往復6〜12万円、ビジネス20〜40万円）などの相場知識も活用して判断してください。`
+}
 
 interface RequestBody {
   query: SearchQuery
@@ -86,7 +91,7 @@ export async function POST(request: NextRequest) {
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 1000,
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(),
       messages: [{ role: 'user', content: userMessage }],
     }),
   })
