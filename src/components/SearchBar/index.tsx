@@ -19,6 +19,7 @@ interface Props {
 
 export interface SearchBarHandle {
   focus: () => void
+  setQuery: (q: string) => void
 }
 
 const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
@@ -34,6 +35,7 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
 
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
+    setQuery: (q: string) => { setRawQuery(q); setParsed(null) },
   }))
 
   useEffect(() => {

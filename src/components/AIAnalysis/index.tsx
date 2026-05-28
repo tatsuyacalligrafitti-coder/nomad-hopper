@@ -83,6 +83,7 @@ export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
+  const [hasReSearched, setHasReSearched] = useState(false)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -258,6 +259,13 @@ export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
 
             {chatMessages.length > 0 && (
               <div ref={chatContainerRef} className="space-y-2 max-h-60 overflow-y-auto">
+                {hasReSearched && (
+                  <div className="flex items-center gap-2 text-xs text-gray-400 py-1">
+                    <div className="flex-1 border-t border-gray-200" />
+                    <span>↩ 前の会話から続いています</span>
+                    <div className="flex-1 border-t border-gray-200" />
+                  </div>
+                )}
                 {chatMessages.map((msg, i) => {
                   const isLastAssistant =
                     msg.role === 'assistant' && i === chatMessages.length - 1 && !chatLoading
@@ -295,6 +303,7 @@ export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
                             onClick={() => {
                               const s = msg.searchSuggestion!
                               setResult(null)
+                              setHasReSearched(true)
                               onReSearch({
                                 origin: s.origin,
                                 destination: s.destination,

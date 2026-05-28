@@ -144,6 +144,8 @@ export default function HomePage() {
             categorized={categorized}
             query={lastQuery}
             onReSearch={(q) => {
+              const raw = `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`
+              searchBarRef.current?.setQuery(raw)
               handleSearch({
                 origin: q.origin,
                 destination: q.destination,
@@ -151,7 +153,7 @@ export default function HomePage() {
                 returnDate: q.returnDate,
                 passengers: lastQuery.passengers,
                 cabinClass: lastQuery.cabinClass,
-                rawQuery: `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`,
+                rawQuery: raw,
               })
             }}
           />
