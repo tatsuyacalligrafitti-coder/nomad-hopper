@@ -81,6 +81,50 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
   // ── Segment expand / flight selection state ──────────────────────────────────
   const [expandedSegments, setExpandedSegments] = useState<Set<number>>(new Set())
   const [selectedFlights, setSelectedFlights] = useState<Record<number, number>>({})
+  const [changeComment, setChangeComment] = useState<string | null>(null)
+  const [isChangingFlight, setIsChangingFlight] = useState(false)
+
+  const handleSelectFlight = async (segIdx: number, newFlightIdx: number, oldFlightIdx: number) => {
+    if (!result) return
+    setSelectedFlights(prev => ({ ...prev, [segIdx]: newFlightIdx }))
+
+    const seg = result.segments[segIdx]
+    const before = (seg.top5Flights ?? [])[oldFlightIdx] ?? seg.cheapestFlight
+    const after = (seg.top5Flights ?? [])[newFlightIdx]
+    if (!before || !after) return
+
+    setIsChangingFlight(true)
+    setChangeComment(null)
+    try {
+      const res = await fetch('/api/ai-flight-change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          before: {
+            carrierName: before.segments[0]?.carrierName ?? '',
+            price: before.totalPrice,
+            duration: before.totalDuration,
+            stops: before.stops,
+          },
+          after: {
+            carrierName: after.segments[0]?.carrierName ?? '',
+            price: after.totalPrice,
+            duration: after.totalDuration,
+            stops: after.stops,
+          },
+          priceDiff: after.totalPrice - before.totalPrice,
+          durationDiff: after.totalDuration - before.totalDuration,
+        }),
+      })
+      const data = await res.json()
+      if (data.comment) setChangeComment(data.comment)
+    } catch {
+      // comment is non-critical; silently ignore errors
+    } finally {
+      setIsChangingFlight(false)
+    }
+  }
+
   const toggleSegment = (idx: number) => {
     setExpandedSegments(prev => {
       const next = new Set(prev)
@@ -379,7 +423,7 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
                                             </span>
                                           ) : (
                                             <button
-                                              onClick={() => setSelectedFlights(prev => ({ ...prev, [ci]: fi }))}
+                                              onClick={() => handleSelectFlight(ci, fi, selectedIdx)}
                                               className="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors whitespace-nowrap"
                                             >
                                               この便を選ぶ
@@ -408,6 +452,18 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
           })}
         </div>
 
+        {/* AI flight-change comment */}
+        {(isChangingFlight || changeComment) && (
+          <div className="mt-3 flex items-start gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2.5">
+            <span className="text-base shrink-0 mt-0.5">✨</span>
+            {isChangingFlight ? (
+              <p className="text-sm text-indigo-500 italic">AIが分析中...</p>
+            ) : (
+              <p className="text-sm text-indigo-800 leading-relaxed">{changeComment}</p>
+            )}
+          </div>
+        )}
+
         {/* Total */}
         {totalPrice > 0 && (
           <div className="mt-4 pt-4 border-t border-gray-100">
@@ -429,7 +485,7 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
                 </div>
                 {isCustom && (
                   <button
-                    onClick={() => setSelectedFlights({})}
+                    onClick={() => { setSelectedFlights({}); setChangeComment(null) }}
                     className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
                   >
                     ↺ 最安に戻す
