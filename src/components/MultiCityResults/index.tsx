@@ -36,6 +36,7 @@ interface Props {
   error?: string
   onReSearch?: (q: { origin: string; destination: string; departureDate: string; returnDate?: string }) => void
   initialSelectedFlights?: Record<number, number>
+  rawQuery?: string
 }
 
 function formatDate(dateStr: string): string {
@@ -73,7 +74,7 @@ function TypingDots() {
   )
 }
 
-export default function MultiCityResults({ result, isLoading, error, onReSearch, initialSelectedFlights }: Props) {
+export default function MultiCityResults({ result, isLoading, error, onReSearch, initialSelectedFlights, rawQuery }: Props) {
   // ── AI analysis state ────────────────────────────────────────────────────────
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<MultiCityAnalysis | null>(null)
@@ -209,8 +210,8 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
 
   const handleShare = async () => {
     if (!result) return
-    const cities = [result.segments[0].origin, ...result.segments.map(s => s.destination)]
-    const queryStr = cities.join('→') + ' ' + result.segments[0].date + '出発'
+    const queryStr = rawQuery
+      ?? ([result.segments[0].origin, ...result.segments.map(s => s.destination)].join('→') + ' ' + result.segments[0].date + '出発')
     const selStr = result.segments.map((_, i) => selectedFlights[i] ?? 0).join(',')
     const url = `${window.location.origin}?q=${encodeURIComponent(queryStr)}&sel=${selStr}`
     await navigator.clipboard.writeText(url).catch(() => {})

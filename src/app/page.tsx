@@ -48,6 +48,7 @@ export default function HomePage() {
   const [multiCityResult, setMultiCityResult] = useState<MultiCitySearchResult | null>(null)
   const [isMultiCityLoading, setIsMultiCityLoading] = useState(false)
   const [multiCityError, setMultiCityError] = useState('')
+  const [multiCityRawQuery, setMultiCityRawQuery] = useState<string | null>(null)
 
   const [exploreParams, setExploreParams] = useState<ExploreParams | null>(null)
   const [pendingSelections, setPendingSelections] = useState<Record<number, number> | null>(null)
@@ -117,10 +118,11 @@ export default function HomePage() {
     setError('')
   }
 
-  const handleMultiCitySearch = async (query: MultiCityParsedQuery) => {
+  const handleMultiCitySearch = async (query: MultiCityParsedQuery, rawQuery?: string) => {
     setIsMultiCityLoading(true)
     setMultiCityError('')
     setMultiCityResult(null)
+    if (rawQuery !== undefined) setMultiCityRawQuery(rawQuery)
     setCategorized(null)
     setSearched(false)
     setExploreParams(null)
@@ -262,6 +264,7 @@ export default function HomePage() {
             isLoading={isMultiCityLoading}
             error={multiCityError}
             initialSelectedFlights={pendingSelections ?? undefined}
+            rawQuery={multiCityRawQuery ?? undefined}
             onReSearch={(q) => {
               const raw = `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`
               searchBarRef.current?.setQuery(raw)

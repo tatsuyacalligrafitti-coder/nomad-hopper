@@ -20,7 +20,7 @@ interface ExploreParams {
 
 interface Props {
   onSearch: (query: SearchQuery) => void
-  onMultiCitySearch?: (query: MultiCityParsedQuery) => void
+  onMultiCitySearch?: (query: MultiCityParsedQuery, rawQuery: string) => void
   onExplore?: (params: ExploreParams) => void
   isLoading: boolean
 }
@@ -100,7 +100,7 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
 
     // Multi-city path
     if (isMultiCity(p)) {
-      if (onMultiCitySearch) onMultiCitySearch(p)
+      if (onMultiCitySearch) onMultiCitySearch(p, rawQuery)
       return
     }
 
