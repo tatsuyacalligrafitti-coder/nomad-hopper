@@ -63,6 +63,35 @@ export interface CategorizedFlights {
   recommended: FlightResult[]
 }
 
+// ── Multi-city ────────────────────────────────────────────────────────────────
+
+export interface MultiCitySegmentQuery {
+  origin: string
+  destination: string
+  date: string
+}
+
+export interface MultiCityParsedQuery {
+  type: 'multi-city'
+  segments: MultiCitySegmentQuery[]
+  passengers: number
+  cabinClass: 'economy' | 'premium_economy' | 'business' | 'first'
+}
+
+export interface MultiCitySegmentResult {
+  origin: string
+  destination: string
+  date: string
+  cheapestPrice: number | null
+  cheapestFlight: FlightResult | null
+}
+
+export interface MultiCitySearchResult {
+  type: 'multi-city'
+  segments: MultiCitySegmentResult[]
+  totalPrice: number
+}
+
 export interface ModeConfig {
   id: SearchMode
   label: string

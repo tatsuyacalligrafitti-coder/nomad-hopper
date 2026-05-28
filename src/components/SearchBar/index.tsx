@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
-import { Search, Loader2, MapPin, Calendar, Users } from 'lucide-react'
+import { Search, Loader2, MapPin, Calendar, Users, Plane } from 'lucide-react'
 import { parseSearchQuery } from '@/lib/parser'
-import type { SearchQuery, ParsedQuery } from '@/types'
+import type { SearchQuery, ParsedQuery, MultiCityParsedQuery } from '@/types'
 
 const EXAMPLES = [
   '東京からバンコクへ 12月25日 1名',
@@ -14,6 +14,7 @@ const EXAMPLES = [
 
 interface Props {
   onSearch: (query: SearchQuery) => void
+  onMultiCitySearch?: (query: MultiCityParsedQuery) => void
   isLoading: boolean
 }
 
@@ -22,12 +23,16 @@ export interface SearchBarHandle {
   setQuery: (q: string) => void
 }
 
+function isMultiCity(p: ParsedQuery | MultiCityParsedQuery | null): p is MultiCityParsedQuery {
+  return p !== null && (p as MultiCityParsedQuery).type === 'multi-city'
+}
+
 const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
-  { onSearch, isLoading },
+  { onSearch, onMultiCitySearch, isLoading },
   ref,
 ) {
   const [rawQuery, setRawQuery] = useState('')
-  const [parsed, setParsed] = useState<ParsedQuery | null>(null)
+  const [parsed, setParsed] = useState<ParsedQuery | MultiCityParsedQuery | null>(null)
   const [isParsing, setIsParsing] = useState(false)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -65,10 +70,10 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
     e.preventDefault()
     setError('')
 
-    // Use debounced parsed state if available, otherwise call the API directly.
-    // Never fall back to the client-side parser alone — it lacks the airport DB.
-    let p = parsed
-    if (!p || !p.origin || !p.destination || !p.departureDate) {
+    let p: ParsedQuery | MultiCityParsedQuery | null = parsed
+
+    // Fetch from API if not yet parsed or fields are missing
+    if (!p || (!isMultiCity(p) && (!p.origin || !p.destination || !p.departureDate))) {
       setIsParsing(true)
       try {
         const res = await fetch('/api/parse-query', {
@@ -78,37 +83,51 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
         })
         const data = await res.json()
         setParsed(data)
-        p = data
+        p = data as ParsedQuery | MultiCityParsedQuery
       } catch {
-        // fall through to show error below
+        // fall through to show error
       } finally {
         setIsParsing(false)
       }
     }
 
-    if (!p?.origin) {
+    // Multi-city path
+    if (isMultiCity(p)) {
+      if (onMultiCitySearch) onMultiCitySearch(p)
+      return
+    }
+
+    // Single-city validation
+    const sq = p as ParsedQuery | null
+    if (!sq?.origin) {
       setError('出発地を認識できませんでした（例: 東京から、HND）')
       return
     }
-    if (!p?.destination) {
+    if (!sq?.destination) {
       setError('目的地を認識できませんでした（例: バンコクへ、BKK）')
       return
     }
-    if (!p?.departureDate) {
+    if (!sq?.departureDate) {
       setError('日程を認識できませんでした（例: 12月25日、来週）')
       return
     }
 
     onSearch({
-      origin: p.origin,
-      destination: p.destination,
-      departureDate: p.departureDate,
-      returnDate: p.returnDate ?? undefined,
-      passengers: p.passengers,
-      cabinClass: p.cabinClass,
+      origin: sq.origin,
+      destination: sq.destination,
+      departureDate: sq.departureDate,
+      returnDate: sq.returnDate ?? undefined,
+      passengers: sq.passengers,
+      cabinClass: sq.cabinClass,
       rawQuery,
     })
   }
+
+  // Preview rendering
+  const showSinglePreview =
+    parsed && !isMultiCity(parsed) &&
+    ((parsed as ParsedQuery).origin || (parsed as ParsedQuery).destination || (parsed as ParsedQuery).departureDate)
+  const pq = showSinglePreview ? (parsed as ParsedQuery) : null
 
   return (
     <div className="w-full space-y-3">
@@ -147,36 +166,50 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
         ))}
       </div>
 
-      {parsed && (parsed.origin || parsed.destination || parsed.departureDate) && (
+      {/* Multi-city preview */}
+      {parsed && isMultiCity(parsed) && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <div className="flex items-center gap-1.5 bg-purple-50 text-purple-700 rounded-full px-3 py-1">
+            <Plane size={13} style={{ transform: 'rotate(-45deg)' }} />
+            <span className="font-semibold">マルチシティ {parsed.segments.length}区間</span>
+          </div>
+          <span className="text-xs text-gray-500">
+            {[parsed.segments[0].origin, ...parsed.segments.map((s) => s.destination)].join(' → ')}
+          </span>
+        </div>
+      )}
+
+      {/* Single-city preview */}
+      {pq && (
         <div className="flex flex-wrap gap-3 text-sm text-gray-600">
-          {parsed.origin && (
+          {pq.origin && (
             <div className="flex items-center gap-1 bg-green-50 text-green-700 rounded-full px-3 py-1">
               <MapPin size={13} />
-              <span>出発: {parsed.origin}</span>
+              <span>出発: {pq.origin}</span>
             </div>
           )}
-          {parsed.destination && (
+          {pq.destination && (
             <div className="flex items-center gap-1 bg-blue-50 text-blue-700 rounded-full px-3 py-1">
               <MapPin size={13} />
-              <span>到着: {parsed.destination}</span>
+              <span>到着: {pq.destination}</span>
             </div>
           )}
-          {parsed.departureDate && (
+          {pq.departureDate && (
             <div className="flex items-center gap-1 bg-purple-50 text-purple-700 rounded-full px-3 py-1">
               <Calendar size={13} />
-              <span>{parsed.departureDate}</span>
+              <span>{pq.departureDate}</span>
             </div>
           )}
-          {parsed.returnDate && (
+          {pq.returnDate && (
             <div className="flex items-center gap-1 bg-purple-50 text-purple-700 rounded-full px-3 py-1">
               <Calendar size={13} />
-              <span>帰り: {parsed.returnDate}</span>
+              <span>帰り: {pq.returnDate}</span>
             </div>
           )}
-          {parsed.passengers > 1 && (
+          {pq.passengers > 1 && (
             <div className="flex items-center gap-1 bg-orange-50 text-orange-700 rounded-full px-3 py-1">
               <Users size={13} />
-              <span>{parsed.passengers}名</span>
+              <span>{pq.passengers}名</span>
             </div>
           )}
         </div>

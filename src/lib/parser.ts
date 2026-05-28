@@ -249,7 +249,7 @@ const SORTED_ENTRIES = Object.entries(AIRPORT_MAP).sort(
 // " to " (with spaces) avoids matching "to" inside "tokyo".
 const ROUTE_SEPARATORS = ['から', '→', '->', '⇒', '〜', '~', '発', ' to ']
 
-function resolveAirport(fragment: string): string | null {
+export function resolveAirport(fragment: string): string | null {
   const trimmed = fragment.trim()
   if (!trimmed) return null
 
@@ -271,7 +271,7 @@ function resolveAirport(fragment: string): string | null {
   return null
 }
 
-function parseDate(text: string): string | null {
+export function parseDate(text: string): string | null {
   const today = new Date()
   const year = today.getFullYear()
 
@@ -333,14 +333,14 @@ function parseDate(text: string): string | null {
   return null
 }
 
-function parseCabinClass(text: string): ParsedQuery['cabinClass'] {
+export function parseCabinClass(text: string): ParsedQuery['cabinClass'] {
   if (/ビジネス|business\s*class/i.test(text)) return 'business'
   if (/ファースト|first\s*class/i.test(text)) return 'first'
   if (/プレミアムエコノミー|premium[\s_]?economy/i.test(text)) return 'premium_economy'
   return 'economy'
 }
 
-function parsePassengers(text: string): number {
+export function parsePassengers(text: string): number {
   const match = text.match(/(\d+)\s*(人|名|pax|passengers?)/i)
   if (match) return Math.min(Math.max(parseInt(match[1]), 1), 9)
   return 1

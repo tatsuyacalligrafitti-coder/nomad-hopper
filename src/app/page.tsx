@@ -7,7 +7,8 @@ import ModeSelector from '@/components/ModeSelector'
 import FlightResults from '@/components/FlightResults'
 import AIAnalysis from '@/components/AIAnalysis'
 import AIChat from '@/components/AIChat'
-import type { CategorizedFlights, SearchMode, SearchQuery } from '@/types'
+import MultiCityResults from '@/components/MultiCityResults'
+import type { CategorizedFlights, SearchMode, SearchQuery, MultiCityParsedQuery, MultiCitySearchResult } from '@/types'
 
 const MODE_HINTS: Record<SearchMode, string> = {
   price:   'お得な最安値の航空券を探します',
@@ -37,6 +38,10 @@ export default function HomePage() {
   const [searched, setSearched] = useState(false)
   const [lastQuery, setLastQuery] = useState<SearchQuery | null>(null)
 
+  const [multiCityResult, setMultiCityResult] = useState<MultiCitySearchResult | null>(null)
+  const [isMultiCityLoading, setIsMultiCityLoading] = useState(false)
+  const [multiCityError, setMultiCityError] = useState('')
+
   const searchBarRef = useRef<SearchBarHandle>(null)
 
   const handleModeChange = async (newMode: SearchMode) => {
@@ -64,11 +69,39 @@ export default function HomePage() {
     }
   }
 
+  const handleMultiCitySearch = async (query: MultiCityParsedQuery) => {
+    setIsMultiCityLoading(true)
+    setMultiCityError('')
+    setMultiCityResult(null)
+    setCategorized(null)
+    setSearched(false)
+    try {
+      const res = await fetch('/api/search-multi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          segments: query.segments,
+          passengers: query.passengers,
+          cabinClass: query.cabinClass,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? '検索に失敗しました')
+      setMultiCityResult(data)
+    } catch (err) {
+      setMultiCityError(err instanceof Error ? err.message : '検索に失敗しました')
+    } finally {
+      setIsMultiCityLoading(false)
+    }
+  }
+
   const handleSearch = async (query: SearchQuery) => {
     setIsLoading(true)
     setError('')
     setSearched(true)
     setLastQuery(query)
+    setMultiCityResult(null)
+    setMultiCityError('')
 
     const searchQuery: SearchQuery =
       mode === 'elegant' ? { ...query, cabinClass: 'business' } : query
@@ -131,7 +164,8 @@ export default function HomePage() {
         <SearchBar
           ref={searchBarRef}
           onSearch={handleSearch}
-          isLoading={isLoading}
+          onMultiCitySearch={handleMultiCitySearch}
+          isLoading={isLoading || isMultiCityLoading}
         />
 
         {/* AI Analysis */}
@@ -156,6 +190,15 @@ export default function HomePage() {
                 rawQuery: raw,
               })
             }}
+          />
+        )}
+
+        {/* Multi-city results */}
+        {(isMultiCityLoading || multiCityResult || multiCityError) && (
+          <MultiCityResults
+            result={multiCityResult}
+            isLoading={isMultiCityLoading}
+            error={multiCityError}
           />
         )}
 
