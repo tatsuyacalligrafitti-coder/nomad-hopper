@@ -5,8 +5,8 @@ import './globals.css'
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
 
 export const metadata: Metadata = {
-  title: 'Nomad Hopper — 自然言語で航空券を検索',
-  description: '話すように検索して最安値フライトを見つけよう',
+  title: 'Tobira — 自然言語で航空券を検索',
+  description: '世界への扉を、あなたの手に。話しかけるだけで旅が始まる。',
   icons: { icon: '/favicon.ico' },
 }
 

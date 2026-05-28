@@ -35,6 +35,37 @@ async function fetchFlights(query: SearchQuery): Promise<CategorizedFlights | nu
   return data.categorized ?? null
 }
 
+const SUBCOPY = [
+  '行けるかも、をさがそう。',
+  '話しかけるだけで、旅が始まる。',
+  'あなたの次の冒険、一緒に探します。',
+]
+
+function RotatingSubcopy() {
+  const [index, setIndex] = useState(0)
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisible(false)
+      setTimeout(() => {
+        setIndex((i) => (i + 1) % SUBCOPY.length)
+        setVisible(true)
+      }, 400)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <p
+      className="text-gray-500 text-lg transition-opacity duration-400"
+      style={{ opacity: visible ? 1 : 0 }}
+    >
+      {SUBCOPY[index]}
+    </p>
+  )
+}
+
 export default function HomePage() {
   const [categorized, setCategorized] = useState<CategorizedFlights | null>(null)
   const [baseCategorized, setBaseCategorized] = useState<CategorizedFlights | null>(null)
@@ -176,10 +207,10 @@ export default function HomePage() {
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-2">
           <div className="flex items-center gap-2 text-indigo-700">
             <Plane size={22} style={{ transform: 'rotate(-45deg)' }} />
-            <span className="text-xl font-extrabold tracking-tight">Nomad Hopper</span>
+            <span className="text-xl font-extrabold tracking-tight">Tobira</span>
           </div>
           <span className="text-xs text-gray-400 hidden sm:block">
-            話すように航空券を検索
+            世界への扉を、あなたの手に。
           </span>
         </div>
       </header>
@@ -187,16 +218,18 @@ export default function HomePage() {
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-8 space-y-5">
 
         {/* Hero - always visible */}
-        <div className="text-center pt-4 pb-4">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-2xl mb-4">
+        <div className="text-center pt-6 pb-6 bg-gradient-to-b from-white via-indigo-50/30 to-white rounded-3xl">
+          <div className="relative inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-2xl mb-4">
             <Plane size={32} className="text-indigo-600" style={{ transform: 'rotate(-45deg)' }} />
+            <span className="absolute -top-2 -right-1 text-indigo-300 text-xs animate-float1">✦</span>
+            <span className="absolute -bottom-1 -right-3 text-indigo-200 text-xs animate-float2">✦</span>
+            <span className="absolute -top-1 -left-3 text-indigo-300 text-xs animate-float3">✦</span>
+            <span className="absolute bottom-0 -left-2 text-indigo-200 text-[10px] animate-float4">✦</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-2">
-            話すように<span className="text-indigo-600">検索</span>しよう
+          <h1 className="font-bold text-4xl text-gray-900 mb-3">
+            世界は思ったより、<span className="text-indigo-600">近い。</span>
           </h1>
-          <p className="text-gray-500 text-sm sm:text-base">
-            「東京から沖縄 6/23出発」のように入力するだけ
-          </p>
+          <RotatingSubcopy />
         </div>
 
         {/* Mode selector - always visible */}
@@ -296,7 +329,7 @@ export default function HomePage() {
       </main>
 
       <footer className="text-center text-xs text-gray-400 py-6 border-t border-gray-100 mt-4">
-        2025 Nomad Hopper · Powered by Travelpayouts
+        2026 Tobira · 世界への扉を、あなたの手に。
       </footer>
 
       {/* AI Chat — fixed position, always rendered */}

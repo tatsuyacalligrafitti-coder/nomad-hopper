@@ -7,3 +7,25 @@
 body {
   font-family: var(--font-geist), system-ui, -apple-system, sans-serif;
 }
+
+@keyframes float1 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.6; }
+  50% { transform: translateY(-6px) rotate(20deg); opacity: 1; }
+}
+@keyframes float2 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.4; }
+  50% { transform: translateY(-8px) rotate(-15deg); opacity: 0.9; }
+}
+@keyframes float3 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.5; }
+  50% { transform: translateY(-5px) rotate(10deg); opacity: 1; }
+}
+@keyframes float4 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.3; }
+  50% { transform: translateY(-7px) rotate(-20deg); opacity: 0.8; }
+}
+
+.animate-float1 { animation: float1 3s ease-in-out infinite; }
+.animate-float2 { animation: float2 3.7s ease-in-out infinite 0.5s; }
+.animate-float3 { animation: float3 2.8s ease-in-out infinite 1s; }
+.animate-float4 { animation: float4 3.3s ease-in-out infinite 1.5s; }

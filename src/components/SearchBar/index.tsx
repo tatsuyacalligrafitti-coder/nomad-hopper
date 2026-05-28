@@ -6,10 +6,10 @@ import { parseSearchQuery } from '@/lib/parser'
 import type { SearchQuery, ParsedQuery, MultiCityParsedQuery } from '@/types'
 
 const EXAMPLES = [
-  '東京からバンコクへ 12月25日 1名',
-  '成田→ロンドン 来月 ビジネスクラス',
-  '大阪からソウル 3日後',
-  '羽田からシンガポール 1/15 2名',
+  '🇹🇭 東京からバンコクへ 来月',
+  '🇰🇪 東京からケニアへ 夏休み',
+  '🇬🇧 東京からロンドンへ 年末',
+  '🇵🇭 大阪からマニラへ 3泊',
 ]
 
 interface ExploreParams {
