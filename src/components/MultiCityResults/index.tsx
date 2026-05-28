@@ -1,6 +1,7 @@
 'use client'
 
 import { Loader2, Plane } from 'lucide-react'
+import { IATA_JP_NAMES } from '@/lib/iata-names'
 import type { MultiCitySearchResult } from '@/types'
 
 interface Props {
@@ -20,12 +21,24 @@ function formatDuration(minutes: number): string {
   return m > 0 ? `${h}h${m}m` : `${h}h`
 }
 
+/** Resolve display label for a city node.
+ *  Priority: JP name map → English city from API response → IATA code */
+function getCityLabel(
+  iata: string,
+  cityFromApi: string | undefined,
+): string {
+  const jp = IATA_JP_NAMES[iata.toUpperCase()]
+  if (jp) return jp
+  if (cityFromApi) return cityFromApi
+  return iata
+}
+
 export default function MultiCityResults({ result, isLoading, error }: Props) {
   if (isLoading) {
     return (
       <div className="rounded-2xl border border-purple-200 bg-purple-50 p-6 flex items-center gap-3 text-purple-700">
         <Loader2 size={18} className="animate-spin shrink-0" />
-        <span className="text-sm font-medium">各区間を並列検索中...</span>
+        <span className="text-sm font-medium">各区間を順番に検索中...</span>
       </div>
     )
   }
@@ -40,18 +53,14 @@ export default function MultiCityResults({ result, isLoading, error }: Props) {
 
   if (!result) return null
 
-  // Collect all city nodes: origin of seg[0], then each destination
-  const cities: string[] = [result.segments[0].origin, ...result.segments.map((s) => s.destination)]
-
-  // Try to get display names from cheapestFlight segments
-  function getCityName(iata: string, segIdx: number, role: 'origin' | 'destination'): string {
-    const seg = result!.segments[segIdx]
-    const flight = seg.cheapestFlight
-    if (!flight) return iata
-    const fs = flight.segments[0]
-    if (!fs) return iata
-    return role === 'origin' ? (fs.originName || iata) : (fs.destinationName || iata)
-  }
+  // Build city node list: origin of seg[0], then each segment's destination
+  const cityNodes: Array<{ iata: string; cityFromApi?: string }> = [
+    {
+      iata: result.segments[0].origin,
+      cityFromApi: result.segments[0].originCity,
+    },
+    ...result.segments.map((s) => ({ iata: s.destination, cityFromApi: s.destinationCity })),
+  ]
 
   return (
     <div className="rounded-2xl border border-purple-200 bg-white overflow-hidden">
@@ -65,17 +74,13 @@ export default function MultiCityResults({ result, isLoading, error }: Props) {
       {/* Timeline */}
       <div className="p-5">
         <div className="space-y-0">
-          {cities.map((iata, ci) => {
-            const isLast = ci === cities.length - 1
-            const segIdx = ci // segment that departs from this city (undefined for last city)
-            const seg = !isLast ? result.segments[segIdx] : null
+          {cityNodes.map(({ iata, cityFromApi }, ci) => {
+            const isLast = ci === cityNodes.length - 1
+            const seg = !isLast ? result.segments[ci] : null
             const flight = seg?.cheapestFlight ?? null
             const carrier = flight?.segments[0]?.carrierName ?? ''
             const duration = flight?.totalDuration ?? 0
-
-            const cityName = ci === 0
-              ? getCityName(iata, 0, 'origin')
-              : getCityName(iata, ci - 1, 'destination')
+            const label = getCityLabel(iata, cityFromApi)
 
             return (
               <div key={ci}>
@@ -87,7 +92,7 @@ export default function MultiCityResults({ result, isLoading, error }: Props) {
                   </div>
                   <div className="pb-0">
                     <p className="font-bold text-gray-900 text-sm">
-                      {cityName}
+                      {label}
                       <span className="ml-1.5 text-xs font-normal text-gray-400">({iata})</span>
                     </p>
                   </div>
@@ -118,7 +123,7 @@ export default function MultiCityResults({ result, isLoading, error }: Props) {
                               <p className="text-base font-bold text-purple-700 tabular-nums">
                                 ¥{Math.round(seg.cheapestPrice!).toLocaleString()}
                               </p>
-                              <p className="text-xs text-gray-400">最安値</p>
+                              <p className="text-xs text-gray-400">片道最安値</p>
                             </div>
                           </div>
                         ) : (
@@ -146,7 +151,7 @@ export default function MultiCityResults({ result, isLoading, error }: Props) {
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-gray-400">片道目安</p>
+              <p className="text-xs text-gray-400">1区間平均</p>
               <p className="text-sm font-semibold text-gray-600 tabular-nums">
                 ¥{Math.round(result.totalPrice / result.segments.length).toLocaleString()}/区間
               </p>

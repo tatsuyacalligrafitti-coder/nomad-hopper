@@ -20,10 +20,13 @@ const cityIndex = new Map<string, string>()
 const nameEntries: { lower: string; iata: string }[] = []
 // country ISO → ordered IATA list (International airports first)
 const countryIndex = new Map<string, string[]>()
+// IATA → airport record
+const iataIndex = new Map<string, AirportRecord>()
 
 for (const ap of airports) {
   const cityKey = ap.city.toLowerCase().trim()
   const isIntl = ap.name.toLowerCase().includes('international')
+  iataIndex.set(ap.iata, ap)
 
   // city index: overwrite with international airport if one exists
   if (!cityIndex.has(cityKey) || isIntl) {
@@ -210,6 +213,13 @@ const COUNTRY_PREFERRED: Record<string, string> = {
 const COUNTRY_NAME_ENTRIES = Object.entries(COUNTRY_NAME_TO_ISO).sort(
   ([a], [b]) => b.length - a.length
 )
+
+/** Look up airport record by IATA code. Returns null if not found. */
+export function getAirportByIata(iata: string): { name: string; city: string; country: string } | null {
+  const ap = iataIndex.get(iata.toUpperCase())
+  if (!ap) return null
+  return { name: ap.name, city: ap.city, country: ap.country }
+}
 
 // ── Public API ────────────────────────────────────────────────────────────────
 

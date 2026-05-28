@@ -82,6 +82,8 @@ export interface MultiCitySegmentResult {
   origin: string
   destination: string
   date: string
+  originCity?: string
+  destinationCity?: string
   cheapestPrice: number | null
   cheapestFlight: FlightResult | null
 }
