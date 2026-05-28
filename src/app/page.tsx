@@ -199,6 +199,19 @@ export default function HomePage() {
             result={multiCityResult}
             isLoading={isMultiCityLoading}
             error={multiCityError}
+            onReSearch={(q) => {
+              const raw = `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`
+              searchBarRef.current?.setQuery(raw)
+              handleSearch({
+                origin: q.origin,
+                destination: q.destination,
+                departureDate: q.departureDate,
+                returnDate: q.returnDate,
+                passengers: 1,
+                cabinClass: 'economy',
+                rawQuery: raw,
+              })
+            }}
           />
         )}
 
