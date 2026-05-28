@@ -7,7 +7,14 @@ import {
   parseCabinClass,
 } from '@/lib/parser'
 import { resolveFromDB } from '@/lib/airport-db'
+import { IATA_JP_NAMES } from '@/lib/iata-names'
 import type { MultiCityParsedQuery, MultiCitySegmentQuery } from '@/types'
+
+// Inverse lookup: Japanese city name → IATA code, sorted by name length desc
+// so longer names (e.g. "東京 羽田") are matched before shorter prefixes ("東京").
+const JP_TO_IATA: Array<[string, string]> = Object.entries(IATA_JP_NAMES)
+  .map(([iata, jp]) => [jp, iata] as [string, string])
+  .sort((a, b) => b[0].length - a[0].length)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -25,12 +32,28 @@ function todayPlus(days: number): string {
 function resolveCity(fragment: string): string | null {
   const trimmed = fragment.trim()
   if (!trimmed) return null
-  // Try lightweight parser first (handles Japanese AIRPORT_MAP)
+
+  // 1. Full airport DB (English city/airport names, bare IATA codes)
+  const fromDB = resolveFromDB(trimmed)
+  if (fromDB) return fromDB
+
+  // 2. Japanese name — exact match (resolves "ミラノ" → MXP, "ナイロビ" → NBO, etc.)
+  for (const [jp, iata] of JP_TO_IATA) {
+    if (trimmed === jp) return iata
+  }
+
+  // 3. Japanese name — partial match (fragment contains jp name, or jp name starts with fragment)
+  for (const [jp, iata] of JP_TO_IATA) {
+    if (trimmed.includes(jp) || jp.startsWith(trimmed)) return iata
+  }
+
+  // 4. AIRPORT_MAP lightweight parser (handles common Japanese city names)
   const p = parseSearchQuery(trimmed)
   const code = p.origin ?? p.destination
   if (code) return code
-  // Fall back to full DB (English city names, country names)
-  return resolveFromDB(trimmed) ?? resolveAirport(trimmed)
+
+  // 5. Phonetic/fuzzy fallback
+  return resolveAirport(trimmed)
 }
 
 /** Extract a usable base date from the full query string. */

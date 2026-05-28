@@ -28,6 +28,7 @@ export const IATA_JP_NAMES: Record<string, string> = {
   RUH: 'リヤド', KWI: 'クウェート', BAH: 'バーレーン',
   // アフリカ
   NBO: 'ナイロビ', ADD: 'アディスアベバ', JNB: 'ヨハネスブルグ',
+  CPT: 'ケープタウン', DUR: 'ダーバン',
   CMN: 'カサブランカ', DAR: 'ダルエスサラーム', LOS: 'ラゴス', ACC: 'アクラ',
   // 欧州
   LHR: 'ロンドン', LGW: 'ロンドン', STN: 'ロンドン',
