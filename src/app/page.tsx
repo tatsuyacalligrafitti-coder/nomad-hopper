@@ -7,8 +7,15 @@ import ModeSelector from '@/components/ModeSelector'
 import FlightResults from '@/components/FlightResults'
 import AIAnalysis from '@/components/AIAnalysis'
 import AIChat from '@/components/AIChat'
+import AIExploreChat from '@/components/AIExploreChat'
 import MultiCityResults from '@/components/MultiCityResults'
 import type { CategorizedFlights, SearchMode, SearchQuery, MultiCityParsedQuery, MultiCitySearchResult } from '@/types'
+
+interface ExploreParams {
+  origin?: string
+  destination?: string
+  rawQuery: string
+}
 
 const MODE_HINTS: Record<SearchMode, string> = {
   price:   'お得な最安値の航空券を探します',
@@ -42,6 +49,8 @@ export default function HomePage() {
   const [isMultiCityLoading, setIsMultiCityLoading] = useState(false)
   const [multiCityError, setMultiCityError] = useState('')
 
+  const [exploreParams, setExploreParams] = useState<ExploreParams | null>(null)
+
   const searchBarRef = useRef<SearchBarHandle>(null)
 
   const handleModeChange = async (newMode: SearchMode) => {
@@ -69,12 +78,22 @@ export default function HomePage() {
     }
   }
 
+  const handleExplore = (params: ExploreParams) => {
+    setExploreParams(params)
+    setCategorized(null)
+    setSearched(false)
+    setMultiCityResult(null)
+    setMultiCityError('')
+    setError('')
+  }
+
   const handleMultiCitySearch = async (query: MultiCityParsedQuery) => {
     setIsMultiCityLoading(true)
     setMultiCityError('')
     setMultiCityResult(null)
     setCategorized(null)
     setSearched(false)
+    setExploreParams(null)
     try {
       const res = await fetch('/api/search-multi', {
         method: 'POST',
@@ -102,6 +121,7 @@ export default function HomePage() {
     setLastQuery(query)
     setMultiCityResult(null)
     setMultiCityError('')
+    setExploreParams(null)
 
     const searchQuery: SearchQuery =
       mode === 'elegant' ? { ...query, cabinClass: 'business' } : query
@@ -165,8 +185,20 @@ export default function HomePage() {
           ref={searchBarRef}
           onSearch={handleSearch}
           onMultiCitySearch={handleMultiCitySearch}
+          onExplore={handleExplore}
           isLoading={isLoading || isMultiCityLoading}
         />
+
+        {/* AI Explore Chat — shown when date is ambiguous */}
+        {exploreParams && (
+          <AIExploreChat
+            origin={exploreParams.origin}
+            destination={exploreParams.destination}
+            rawQuery={exploreParams.rawQuery}
+            onSearch={handleSearch}
+            onSetQuery={(q) => searchBarRef.current?.setQuery(q)}
+          />
+        )}
 
         {/* AI Analysis */}
         {searched && !isLoading && !elegantLoading && categorized && lastQuery && (

@@ -12,9 +12,16 @@ const EXAMPLES = [
   '羽田からシンガポール 1/15 2名',
 ]
 
+interface ExploreParams {
+  origin?: string
+  destination?: string
+  rawQuery: string
+}
+
 interface Props {
   onSearch: (query: SearchQuery) => void
   onMultiCitySearch?: (query: MultiCityParsedQuery) => void
+  onExplore?: (params: ExploreParams) => void
   isLoading: boolean
 }
 
@@ -28,7 +35,7 @@ function isMultiCity(p: ParsedQuery | MultiCityParsedQuery | null): p is MultiCi
 }
 
 const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
-  { onSearch, onMultiCitySearch, isLoading },
+  { onSearch, onMultiCitySearch, onExplore, isLoading },
   ref,
 ) {
   const [rawQuery, setRawQuery] = useState('')
@@ -108,7 +115,15 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
       return
     }
     if (!sq?.departureDate) {
-      setError('日程を認識できませんでした（例: 12月25日、来週）')
+      if (onExplore) {
+        onExplore({
+          origin: sq?.origin ?? undefined,
+          destination: sq?.destination ?? undefined,
+          rawQuery,
+        })
+      } else {
+        setError('日程を認識できませんでした（例: 12月25日、来週）')
+      }
       return
     }
 
