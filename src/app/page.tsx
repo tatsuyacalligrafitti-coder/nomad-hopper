@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Plane } from 'lucide-react'
 import SearchBar, { type SearchBarHandle } from '@/components/SearchBar'
 import ModeSelector from '@/components/ModeSelector'
@@ -50,8 +50,38 @@ export default function HomePage() {
   const [multiCityError, setMultiCityError] = useState('')
 
   const [exploreParams, setExploreParams] = useState<ExploreParams | null>(null)
+  const [pendingSelections, setPendingSelections] = useState<Record<number, number> | null>(null)
 
   const searchBarRef = useRef<SearchBarHandle>(null)
+
+  // Auto-search from shared URL (?q=...&sel=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get('q')
+    const sel = params.get('sel')
+    if (!q) return
+
+    searchBarRef.current?.setQuery(q)
+
+    if (sel) {
+      const indices = sel.split(',').map(n => parseInt(n, 10) || 0)
+      const selections: Record<number, number> = {}
+      indices.forEach((idx, segIdx) => { if (idx !== 0) selections[segIdx] = idx })
+      setPendingSelections(selections)
+    }
+
+    fetch('/api/parse-query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data?.type === 'multi-city') handleMultiCitySearch(data)
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleModeChange = async (newMode: SearchMode) => {
     const prevMode = mode
@@ -231,6 +261,7 @@ export default function HomePage() {
             result={multiCityResult}
             isLoading={isMultiCityLoading}
             error={multiCityError}
+            initialSelectedFlights={pendingSelections ?? undefined}
             onReSearch={(q) => {
               const raw = `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`
               searchBarRef.current?.setQuery(raw)

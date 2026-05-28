@@ -35,6 +35,7 @@ interface Props {
   isLoading: boolean
   error?: string
   onReSearch?: (q: { origin: string; destination: string; departureDate: string; returnDate?: string }) => void
+  initialSelectedFlights?: Record<number, number>
 }
 
 function formatDate(dateStr: string): string {
@@ -72,7 +73,7 @@ function TypingDots() {
   )
 }
 
-export default function MultiCityResults({ result, isLoading, error, onReSearch }: Props) {
+export default function MultiCityResults({ result, isLoading, error, onReSearch, initialSelectedFlights }: Props) {
   // ── AI analysis state ────────────────────────────────────────────────────────
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<MultiCityAnalysis | null>(null)
@@ -80,7 +81,8 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
 
   // ── Segment expand / flight selection state ──────────────────────────────────
   const [expandedSegments, setExpandedSegments] = useState<Set<number>>(new Set())
-  const [selectedFlights, setSelectedFlights] = useState<Record<number, number>>({})
+  const [selectedFlights, setSelectedFlights] = useState<Record<number, number>>(initialSelectedFlights ?? {})
+  const [copied, setCopied] = useState(false)
   const [changeComment, setChangeComment] = useState<string | null>(null)
   const [isChangingFlight, setIsChangingFlight] = useState(false)
 
@@ -203,6 +205,17 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
     } finally {
       setChatLoading(false)
     }
+  }
+
+  const handleShare = async () => {
+    if (!result) return
+    const cities = [result.segments[0].origin, ...result.segments.map(s => s.destination)]
+    const queryStr = cities.join('→') + ' ' + result.segments[0].date + '出発'
+    const selStr = result.segments.map((_, i) => selectedFlights[i] ?? 0).join(',')
+    const url = `${window.location.origin}?q=${encodeURIComponent(queryStr)}&sel=${selStr}`
+    await navigator.clipboard.writeText(url).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   const handleChatKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -483,14 +496,22 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
                     ¥{Math.round(totalPrice / result.segments.length).toLocaleString()}/区間
                   </p>
                 </div>
-                {isCustom && (
+                <div className="flex items-center justify-end gap-3">
+                  {isCustom && (
+                    <button
+                      onClick={() => { setSelectedFlights({}); setChangeComment(null) }}
+                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+                    >
+                      ↺ 最安に戻す
+                    </button>
+                  )}
                   <button
-                    onClick={() => { setSelectedFlights({}); setChangeComment(null) }}
-                    className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+                    onClick={handleShare}
+                    className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
                   >
-                    ↺ 最安に戻す
+                    {copied ? '✓ コピーしました！' : '🔗 旅程をシェア'}
                   </button>
-                )}
+                </div>
               </div>
             </div>
           </div>
