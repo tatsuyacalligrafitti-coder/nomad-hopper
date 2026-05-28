@@ -78,8 +78,9 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
   const [analysis, setAnalysis] = useState<MultiCityAnalysis | null>(null)
   const [analysisError, setAnalysisError] = useState('')
 
-  // ── Segment expand state ─────────────────────────────────────────────────────
+  // ── Segment expand / flight selection state ──────────────────────────────────
   const [expandedSegments, setExpandedSegments] = useState<Set<number>>(new Set())
+  const [selectedFlights, setSelectedFlights] = useState<Record<number, number>>({})
   const toggleSegment = (idx: number) => {
     setExpandedSegments(prev => {
       const next = new Set(prev)
@@ -210,6 +211,14 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
     ? (VERDICT_STYLES[analysis.verdict] ?? VERDICT_STYLES['△様子見'])
     : null
 
+  // ── Computed totals (reflect flight selections) ───────────────────────────────
+  const isCustom = Object.values(selectedFlights).some(idx => idx !== 0)
+  const totalPrice = result.segments.reduce((sum, seg, idx) => {
+    const selIdx = selectedFlights[idx] ?? 0
+    const f = (seg.top5Flights ?? [])[selIdx]
+    return sum + (f?.totalPrice ?? seg.cheapestPrice ?? 0)
+  }, 0)
+
   // ── City nodes for timeline ───────────────────────────────────────────────────
   const cityNodes: Array<{ iata: string; cityFromApi?: string }> = [
     { iata: result.segments[0].origin, cityFromApi: result.segments[0].originCity },
@@ -231,7 +240,10 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
           {cityNodes.map(({ iata, cityFromApi }, ci) => {
             const isLast = ci === cityNodes.length - 1
             const seg = !isLast ? result.segments[ci] : null
-            const flight = seg?.cheapestFlight ?? null
+            const selectedIdx = !isLast ? (selectedFlights[ci] ?? 0) : 0
+            const flight = !isLast
+              ? ((seg?.top5Flights ?? [])[selectedIdx] ?? seg?.cheapestFlight ?? null)
+              : null
             const carrier = flight?.segments[0]?.carrierName ?? ''
             const duration = flight?.totalDuration ?? 0
             const label = getCityLabel(iata, cityFromApi)
@@ -260,14 +272,16 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
                       <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 my-1">
                         {flight ? (() => {
                           const estimate = getRouteEstimate(seg.origin, seg.destination)
-                          const badgeEmoji = estimate ? getPriceBadge(seg.cheapestPrice!, estimate) : null
-                          const badgeLabel = estimate ? getPriceBadgeLabel(seg.cheapestPrice!, estimate) : null
-                          const badgeColor = estimate ? getPriceBadgeColor(seg.cheapestPrice!, estimate) : null
+                          const selectedPrice = flight.totalPrice
+                          const isSelected0 = selectedIdx === 0
+                          const badgeEmoji = estimate ? getPriceBadge(selectedPrice, estimate) : null
+                          const badgeLabel = estimate ? getPriceBadgeLabel(selectedPrice, estimate) : null
+                          const badgeColor = estimate ? getPriceBadgeColor(selectedPrice, estimate) : null
                           const isExpanded = expandedSegments.has(ci)
-                          const extras = (seg.top5Flights ?? []).slice(1)
+                          const allFlights = seg.top5Flights ?? []
                           return (
                             <>
-                              {/* Cheapest flight row */}
+                              {/* Selected flight row */}
                               <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <div className="space-y-0.5 min-w-0">
                                   <p className="text-xs text-gray-500">
@@ -283,14 +297,20 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
                                 <div className="flex items-center gap-2 shrink-0">
                                   <div className="text-right">
                                     <p className="text-base font-bold text-purple-700 tabular-nums">
-                                      ¥{Math.round(seg.cheapestPrice!).toLocaleString()}
+                                      ¥{Math.round(selectedPrice).toLocaleString()}
                                     </p>
                                     <div className="flex items-center gap-1 justify-end flex-wrap">
-                                      <p className="text-xs text-gray-400">片道最安値</p>
-                                      {badgeEmoji && badgeLabel && badgeColor && (
-                                        <span className={`text-xs font-medium ${badgeColor}`}>
-                                          {badgeEmoji} {badgeLabel}
-                                        </span>
+                                      {isSelected0 ? (
+                                        <>
+                                          <p className="text-xs text-gray-400">片道最安値</p>
+                                          {badgeEmoji && badgeLabel && badgeColor && (
+                                            <span className={`text-xs font-medium ${badgeColor}`}>
+                                              {badgeEmoji} {badgeLabel}
+                                            </span>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <span className="text-xs font-medium text-amber-600">カスタム選択中</span>
                                       )}
                                     </div>
                                     {estimate && (
@@ -311,29 +331,38 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
                               </div>
 
                               {/* Toggle for extra flights */}
-                              {extras.length > 0 && (
+                              {allFlights.length > 1 && (
                                 <button
                                   onClick={() => toggleSegment(ci)}
                                   className="mt-2 text-xs text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-0.5"
                                 >
-                                  {isExpanded ? '▲ 閉じる' : `▼ 他の便を見る（${extras.length}件）`}
+                                  {isExpanded ? '▲ 閉じる' : `▼ 他の便を見る（${allFlights.length - 1}件）`}
                                 </button>
                               )}
 
-                              {/* Expanded extra flights */}
-                              {isExpanded && extras.length > 0 && (
-                                <div className="mt-2 border-t border-gray-200 pt-2 space-y-2">
-                                  {extras.map((f, fi) => {
+                              {/* Expanded flight list — all alternatives with select button */}
+                              {isExpanded && allFlights.length > 1 && (
+                                <div className="mt-2 border-t border-gray-200 pt-2 space-y-1.5">
+                                  {allFlights.map((f, fi) => {
+                                    const isActive = fi === selectedIdx
                                     const fc = f.segments[0]?.carrierName ?? ''
                                     const fd = f.totalDuration
                                     const fp = Math.round(f.totalPrice)
                                     const fs = f.stops
                                     return (
-                                      <div key={fi} className="flex items-center justify-between gap-2">
+                                      <div
+                                        key={fi}
+                                        className={[
+                                          'flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 transition-colors',
+                                          isActive ? 'bg-indigo-50' : '',
+                                        ].join(' ')}
+                                      >
                                         <div className="space-y-0.5 min-w-0">
-                                          <p className="text-xs text-gray-600">
+                                          <p className="text-xs text-gray-600 flex items-center gap-1.5 flex-wrap">
+                                            {fi === 0 && (
+                                              <span className="text-green-600 font-semibold">最安</span>
+                                            )}
                                             {fc && <span className="font-medium">{fc}</span>}
-                                            {fc && ' '}
                                             <span className="text-gray-400">{fs === 0 ? '直行' : `${fs}回乗継`}</span>
                                           </p>
                                           {fd > 0 && (
@@ -344,14 +373,18 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
                                           <p className="text-sm font-bold text-purple-700 tabular-nums">
                                             ¥{fp.toLocaleString()}
                                           </p>
-                                          <a
-                                            href={aviasalesLink(seg.origin, seg.destination, seg.date, 1)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-xs px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors whitespace-nowrap"
-                                          >
-                                            予約→
-                                          </a>
+                                          {isActive ? (
+                                            <span className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded-lg font-semibold whitespace-nowrap">
+                                              ✓ 選択中
+                                            </span>
+                                          ) : (
+                                            <button
+                                              onClick={() => setSelectedFlights(prev => ({ ...prev, [ci]: fi }))}
+                                              className="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors whitespace-nowrap"
+                                            >
+                                              この便を選ぶ
+                                            </button>
+                                          )}
                                         </div>
                                       </div>
                                     )
@@ -376,19 +409,33 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
         </div>
 
         {/* Total */}
-        {result.totalPrice > 0 && (
-          <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-400">合計（各区間最安値の合算）</p>
-              <p className="text-2xl font-bold text-purple-700 tabular-nums">
-                ¥{Math.round(result.totalPrice).toLocaleString()}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-400">1区間平均</p>
-              <p className="text-sm font-semibold text-gray-600 tabular-nums">
-                ¥{Math.round(result.totalPrice / result.segments.length).toLocaleString()}/区間
-              </p>
+        {totalPrice > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-400">
+                  {isCustom ? 'カスタム旅程 合計' : '合計（各区間最安値の合算）'}
+                </p>
+                <p className="text-2xl font-bold text-purple-700 tabular-nums">
+                  ¥{Math.round(totalPrice).toLocaleString()}
+                </p>
+              </div>
+              <div className="text-right space-y-1.5">
+                <div>
+                  <p className="text-xs text-gray-400">1区間平均</p>
+                  <p className="text-sm font-semibold text-gray-600 tabular-nums">
+                    ¥{Math.round(totalPrice / result.segments.length).toLocaleString()}/区間
+                  </p>
+                </div>
+                {isCustom && (
+                  <button
+                    onClick={() => setSelectedFlights({})}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+                  >
+                    ↺ 最安に戻す
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}
