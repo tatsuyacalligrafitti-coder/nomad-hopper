@@ -101,8 +101,12 @@ function TpCard({ flight, badge, showBusinessBadge }: { flight: FlightResult; ba
 
       <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t border-gray-100 pt-3 sm:border-0 sm:pt-0">
         <div>
+          <p className="text-xs text-gray-400 leading-none mb-1">往復合計</p>
           <p className="text-2xl font-bold text-indigo-700 tabular-nums leading-none">
             ¥{Math.round(flight.totalPrice).toLocaleString()}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            片道目安 ¥{Math.round(flight.totalPrice / 2).toLocaleString()}〜
           </p>
           <div className="flex items-center gap-2 mt-1.5 text-xs flex-wrap">
             {flight.stops === 0 ? (
