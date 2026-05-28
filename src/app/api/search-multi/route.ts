@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
         destinationCity: destInfo?.city,
         cheapestPrice: sorted[0]?.totalPrice ?? null,
         cheapestFlight: sorted[0] ?? null,
+        top5Flights: sorted.slice(0, 5),
       })
     } catch {
       results.push({
@@ -62,6 +63,7 @@ export async function POST(request: NextRequest) {
         destinationCity: destInfo?.city,
         cheapestPrice: null,
         cheapestFlight: null,
+        top5Flights: [],
       })
     }
   }

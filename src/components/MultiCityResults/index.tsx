@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Loader2, Plane, Sparkles, Send } from 'lucide-react'
 import { IATA_JP_NAMES } from '@/lib/iata-names'
 import { aviasalesLink } from '@/lib/travelpayouts'
+import { getRouteEstimate, getPriceBadge, getPriceBadgeLabel, getPriceBadgeColor } from '@/lib/route-estimates'
 import type { MultiCitySearchResult } from '@/types'
 
 interface MultiCityAnalysis {
@@ -76,6 +77,17 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<MultiCityAnalysis | null>(null)
   const [analysisError, setAnalysisError] = useState('')
+
+  // ── Segment expand state ─────────────────────────────────────────────────────
+  const [expandedSegments, setExpandedSegments] = useState<Set<number>>(new Set())
+  const toggleSegment = (idx: number) => {
+    setExpandedSegments(prev => {
+      const next = new Set(prev)
+      if (next.has(idx)) next.delete(idx)
+      else next.add(idx)
+      return next
+    })
+  }
 
   // ── Chat state ───────────────────────────────────────────────────────────────
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
@@ -246,37 +258,109 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch 
                     </div>
                     <div className="flex-1 mb-2">
                       <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 my-1">
-                        {flight ? (
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="space-y-0.5 min-w-0">
-                              <p className="text-xs text-gray-500">
-                                {formatDate(seg.date)} 出発
-                                {carrier && (
-                                  <span className="ml-1.5 font-medium text-gray-700">{carrier}</span>
-                                )}
-                              </p>
-                              {duration > 0 && (
-                                <p className="text-xs text-gray-400">所要 {formatDuration(duration)}</p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <div className="text-right">
-                                <p className="text-base font-bold text-purple-700 tabular-nums">
-                                  ¥{Math.round(seg.cheapestPrice!).toLocaleString()}
-                                </p>
-                                <p className="text-xs text-gray-400">片道最安値</p>
+                        {flight ? (() => {
+                          const estimate = getRouteEstimate(seg.origin, seg.destination)
+                          const badgeEmoji = estimate ? getPriceBadge(seg.cheapestPrice!, estimate) : null
+                          const badgeLabel = estimate ? getPriceBadgeLabel(seg.cheapestPrice!, estimate) : null
+                          const badgeColor = estimate ? getPriceBadgeColor(seg.cheapestPrice!, estimate) : null
+                          const isExpanded = expandedSegments.has(ci)
+                          const extras = seg.top5Flights.slice(1)
+                          return (
+                            <>
+                              {/* Cheapest flight row */}
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <div className="space-y-0.5 min-w-0">
+                                  <p className="text-xs text-gray-500">
+                                    {formatDate(seg.date)} 出発
+                                    {carrier && (
+                                      <span className="ml-1.5 font-medium text-gray-700">{carrier}</span>
+                                    )}
+                                  </p>
+                                  {duration > 0 && (
+                                    <p className="text-xs text-gray-400">所要 {formatDuration(duration)}</p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <div className="text-right">
+                                    <p className="text-base font-bold text-purple-700 tabular-nums">
+                                      ¥{Math.round(seg.cheapestPrice!).toLocaleString()}
+                                    </p>
+                                    <div className="flex items-center gap-1 justify-end flex-wrap">
+                                      <p className="text-xs text-gray-400">片道最安値</p>
+                                      {badgeEmoji && badgeLabel && badgeColor && (
+                                        <span className={`text-xs font-medium ${badgeColor}`}>
+                                          {badgeEmoji} {badgeLabel}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {estimate && (
+                                      <p className="text-xs text-gray-300 mt-0.5">
+                                        相場 ¥{estimate.min.toLocaleString()}〜¥{estimate.max.toLocaleString()}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <a
+                                    href={aviasalesLink(seg.origin, seg.destination, seg.date, 1)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="shrink-0 bg-green-600 hover:bg-green-700 text-white rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors whitespace-nowrap"
+                                  >
+                                    今すぐ予約→
+                                  </a>
+                                </div>
                               </div>
-                              <a
-                                href={aviasalesLink(seg.origin, seg.destination, seg.date, 1)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="shrink-0 bg-green-600 hover:bg-green-700 text-white rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors whitespace-nowrap"
-                              >
-                                今すぐ予約→
-                              </a>
-                            </div>
-                          </div>
-                        ) : (
+
+                              {/* Toggle for extra flights */}
+                              {extras.length > 0 && (
+                                <button
+                                  onClick={() => toggleSegment(ci)}
+                                  className="mt-2 text-xs text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-0.5"
+                                >
+                                  {isExpanded ? '▲ 閉じる' : `▼ 他の便を見る（${extras.length}件）`}
+                                </button>
+                              )}
+
+                              {/* Expanded extra flights */}
+                              {isExpanded && extras.length > 0 && (
+                                <div className="mt-2 border-t border-gray-200 pt-2 space-y-2">
+                                  {extras.map((f, fi) => {
+                                    const fc = f.segments[0]?.carrierName ?? ''
+                                    const fd = f.totalDuration
+                                    const fp = Math.round(f.totalPrice)
+                                    const fs = f.stops
+                                    return (
+                                      <div key={fi} className="flex items-center justify-between gap-2">
+                                        <div className="space-y-0.5 min-w-0">
+                                          <p className="text-xs text-gray-600">
+                                            {fc && <span className="font-medium">{fc}</span>}
+                                            {fc && ' '}
+                                            <span className="text-gray-400">{fs === 0 ? '直行' : `${fs}回乗継`}</span>
+                                          </p>
+                                          {fd > 0 && (
+                                            <p className="text-xs text-gray-400">所要 {formatDuration(fd)}</p>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          <p className="text-sm font-bold text-purple-700 tabular-nums">
+                                            ¥{fp.toLocaleString()}
+                                          </p>
+                                          <a
+                                            href={aviasalesLink(seg.origin, seg.destination, seg.date, 1)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors whitespace-nowrap"
+                                          >
+                                            予約→
+                                          </a>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </>
+                          )
+                        })() : (
                           <div className="flex items-center justify-between">
                             <p className="text-xs text-gray-400">{formatDate(seg.date)} 出発</p>
                             <p className="text-xs text-gray-400">便が見つかりませんでした</p>
