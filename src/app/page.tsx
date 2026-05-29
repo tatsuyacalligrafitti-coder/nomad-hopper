@@ -165,16 +165,45 @@ export default function HomePage() {
         } finally {
           setIsMultiCityLoading(false)
         }
-      } else {
-        const sourceResult = (prevMode === 'elegant' && baseMultiCityResult) ? baseMultiCityResult : multiCityResult
-        if (prevMode === 'elegant' && baseMultiCityResult) {
+      } else if (baseMultiCityResult) {
+        // Use reference comparison instead of prevMode to detect if we're
+        // currently showing business (elegant) results.
+        if (multiCityResult !== baseMultiCityResult) {
           setMultiCityResult(baseMultiCityResult)
         }
         const selections: Record<number, number> = {}
-        sourceResult.segments.forEach((seg, idx) => {
+        baseMultiCityResult.segments.forEach((seg, idx) => {
           selections[idx] = selectByMode(seg.top5Flights ?? [], newMode)
         })
         setMultiCityForcedSelections(selections)
+      } else if (lastMultiCityParsedQuery) {
+        // Fallback: no economy base data — re-fetch with original cabin class
+        setIsMultiCityLoading(true)
+        setMultiCityError('')
+        try {
+          const res = await fetch('/api/search-multi', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              segments: lastMultiCityParsedQuery.segments,
+              passengers: lastMultiCityParsedQuery.passengers,
+              cabinClass: lastMultiCityParsedQuery.cabinClass,
+            }),
+          })
+          const data = await res.json() as MultiCitySearchResult
+          if (!res.ok) throw new Error((data as unknown as { error?: string }).error ?? '検索に失敗しました')
+          setMultiCityResult(data)
+          setBaseMultiCityResult(data)
+          const selections: Record<number, number> = {}
+          data.segments.forEach((seg, idx) => {
+            selections[idx] = selectByMode(seg.top5Flights ?? [], newMode)
+          })
+          setMultiCityForcedSelections(selections)
+        } catch (err) {
+          setMultiCityError(err instanceof Error ? err.message : '検索に失敗しました')
+        } finally {
+          setIsMultiCityLoading(false)
+        }
       }
       return
     }
