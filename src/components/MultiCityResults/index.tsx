@@ -580,13 +580,19 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
             {/* Analysis card */}
             <div className="bg-indigo-50 p-5 space-y-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Sparkles size={15} className="text-indigo-600" />
-                  <span className="text-sm font-bold text-indigo-700">AI価格分析</span>
+                  <span className="text-sm font-bold text-indigo-700">AI分析</span>
+                  <span className="text-xs text-gray-400">
+                    {mode === 'fastest' ? '評価基準：総移動時間・乗り継ぎ回数' :
+                     mode === 'balance' ? '評価基準：価格と所要時間の総合バランス' :
+                     mode === 'elegant' ? '評価基準：ビジネスクラス水準・快適性' :
+                     '評価基準：最安値・相場比較'}
+                  </span>
                 </div>
                 <button
                   onClick={() => { setAnalysis(null); setAnalysisError(''); setChatMessages([]) }}
-                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors shrink-0"
                 >
                   閉じる
                 </button>
