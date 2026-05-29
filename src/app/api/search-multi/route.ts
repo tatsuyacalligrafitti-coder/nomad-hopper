@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   const body: RequestBody = await request.json()
   const { segments, passengers = 1, cabinClass = 'economy' } = body
 
-  if (!Array.isArray(segments) || segments.length < 2) {
+  if (!Array.isArray(segments) || segments.length < 1) {
     return Response.json({ error: '区間が不足しています' }, { status: 400 })
   }
 

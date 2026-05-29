@@ -97,6 +97,7 @@ export default function HomePage() {
   const [isMultiCityLoading, setIsMultiCityLoading] = useState(false)
   const [multiCityError, setMultiCityError] = useState('')
   const [multiCityRawQuery, setMultiCityRawQuery] = useState<string | null>(null)
+  const [retryingSegments, setRetryingSegments] = useState<Set<number>>(new Set())
 
   const [exploreParams, setExploreParams] = useState<ExploreParams | null>(null)
   const [pendingSelections, setPendingSelections] = useState<Record<number, number> | null>(null)
@@ -270,6 +271,46 @@ export default function HomePage() {
     }
   }
 
+  const retrySegment = async (segmentIndex: number, newDate?: string, newOrigin?: string, newDest?: string) => {
+    if (!multiCityResult || !lastMultiCityParsedQuery) return
+    const seg = multiCityResult.segments[segmentIndex]
+    const origin = newOrigin ?? seg.origin
+    const destination = newDest ?? seg.destination
+    const date = newDate ?? seg.date
+
+    setRetryingSegments(prev => new Set([...prev, segmentIndex]))
+    try {
+      const res = await fetch('/api/search-multi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          segments: [{ origin, destination, date }],
+          passengers: lastMultiCityParsedQuery.passengers,
+          cabinClass: lastMultiCityParsedQuery.cabinClass,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) return
+      const newSeg = data.segments?.[0]
+      if (!newSeg) return
+      setMultiCityResult(prev => {
+        if (!prev) return prev
+        const segs = [...prev.segments]
+        segs[segmentIndex] = newSeg
+        const newTotal = segs.reduce((sum, s) => sum + (s.cheapestPrice ?? 0), 0)
+        return { ...prev, segments: segs, totalPrice: newTotal }
+      })
+    } catch {
+      // silently ignore
+    } finally {
+      setRetryingSegments(prev => {
+        const next = new Set(prev)
+        next.delete(segmentIndex)
+        return next
+      })
+    }
+  }
+
   const handleSearch = async (query: SearchQuery) => {
     setIsLoading(true)
     setError('')
@@ -393,6 +434,8 @@ export default function HomePage() {
             forcedSelections={multiCityForcedSelections}
             mode={mode}
             rawQuery={multiCityRawQuery ?? undefined}
+            onRetrySegment={retrySegment}
+            retryingSegments={retryingSegments}
             onReSearch={(q) => {
               const raw = `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`
               searchBarRef.current?.setQuery(raw)

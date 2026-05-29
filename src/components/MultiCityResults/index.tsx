@@ -35,10 +35,37 @@ interface Props {
   isLoading: boolean
   error?: string
   onReSearch?: (q: { origin: string; destination: string; departureDate: string; returnDate?: string }) => void
+  onRetrySegment?: (segmentIndex: number, newDate?: string, newOrigin?: string, newDest?: string) => void
+  retryingSegments?: Set<number>
   initialSelectedFlights?: Record<number, number>
   forcedSelections?: Record<number, number> | null
   mode?: SearchMode
   rawQuery?: string
+}
+
+const NEARBY_AIRPORTS: Record<string, string[]> = {
+  NGO: ['KIX', 'ITM'],
+  OSA: ['KIX', 'ITM', 'NKM'],
+  KIX: ['NGO', 'ITM'],
+  NRT: ['HND'],
+  HND: ['NRT'],
+  FCO: ['CIA'],
+  LON: ['LHR', 'LGW', 'STN'],
+}
+
+const JAPAN_AIRPORTS = new Set(['NRT', 'HND', 'KIX', 'ITM', 'NGO', 'NKM', 'OSA', 'FUK', 'CTS', 'OKA', 'SDJ', 'KMJ', 'KOJ'])
+
+function getNoFlightReason(origin: string, destination: string): string {
+  if (JAPAN_AIRPORTS.has(origin.toUpperCase()) && JAPAN_AIRPORTS.has(destination.toUpperCase())) {
+    return 'この区間の国際線データが限られています'
+  }
+  return 'この区間の便データが取得できませんでした'
+}
+
+function adjustDate(dateStr: string, days: number): string {
+  const d = new Date(dateStr)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().split('T')[0]
 }
 
 function formatDate(dateStr: string): string {
@@ -76,7 +103,7 @@ function TypingDots() {
   )
 }
 
-export default function MultiCityResults({ result, isLoading, error, onReSearch, initialSelectedFlights, forcedSelections, mode, rawQuery }: Props) {
+export default function MultiCityResults({ result, isLoading, error, onReSearch, onRetrySegment, retryingSegments, initialSelectedFlights, forcedSelections, mode, rawQuery }: Props) {
   // ── AI analysis state ────────────────────────────────────────────────────────
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<MultiCityAnalysis | null>(null)
@@ -363,7 +390,12 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                     </div>
                     <div className="flex-1 mb-2">
                       <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 my-1">
-                        {flight ? (() => {
+                        {(retryingSegments?.has(ci)) ? (
+                          <div className="flex items-center gap-2 text-xs text-indigo-500 py-1">
+                            <Loader2 size={14} className="animate-spin shrink-0" />
+                            <span>再検索中...</span>
+                          </div>
+                        ) : flight ? (() => {
                           const estimate = getRouteEstimate(seg.origin, seg.destination)
                           const selectedPrice = flight.totalPrice
                           const isSelected0 = selectedIdx === 0
@@ -487,9 +519,66 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                             </>
                           )
                         })() : (
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs text-gray-400">{formatDate(seg.date)} 出発</p>
-                            <p className="text-xs text-gray-400">便が見つかりませんでした</p>
+                          <div className="space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-gray-400">{formatDate(seg.date)} 出発</p>
+                              <p className="text-xs text-gray-400">便が見つかりませんでした</p>
+                            </div>
+                            <p className="text-xs text-gray-400">
+                              {getNoFlightReason(seg.origin, seg.destination)}
+                            </p>
+                            {/* Date adjustment buttons */}
+                            {onRetrySegment && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {[-3, -1, 1, 3].map(delta => (
+                                  <button
+                                    key={delta}
+                                    onClick={() => onRetrySegment(ci, adjustDate(seg.date, delta))}
+                                    className="text-xs border border-gray-200 rounded px-2 py-1 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+                                  >
+                                    {delta > 0 ? `+${delta}日` : `${delta}日`}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            {/* Nearby airport suggestions */}
+                            {onRetrySegment && (() => {
+                              const originNearby = NEARBY_AIRPORTS[seg.origin.toUpperCase()] ?? []
+                              const destNearby = NEARBY_AIRPORTS[seg.destination.toUpperCase()] ?? []
+                              if (originNearby.length === 0 && destNearby.length === 0) return null
+                              return (
+                                <div className="space-y-1">
+                                  {originNearby.length > 0 && (
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="text-xs text-gray-400">出発地を変更：</span>
+                                      {originNearby.map(ap => (
+                                        <button
+                                          key={ap}
+                                          onClick={() => onRetrySegment(ci, undefined, ap)}
+                                          className="text-xs border border-gray-200 rounded px-2 py-1 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+                                        >
+                                          {ap}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {destNearby.length > 0 && (
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="text-xs text-gray-400">目的地を変更：</span>
+                                      {destNearby.map(ap => (
+                                        <button
+                                          key={ap}
+                                          onClick={() => onRetrySegment(ci, undefined, undefined, ap)}
+                                          className="text-xs border border-gray-200 rounded px-2 py-1 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+                                        >
+                                          {ap}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
                           </div>
                         )}
                       </div>
