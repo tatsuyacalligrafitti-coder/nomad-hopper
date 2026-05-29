@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       const carrier = seg.cheapestFlight.segments[0]?.carrierName ?? ''
       const stops = seg.cheapestFlight.stops
       const dur = seg.cheapestFlight.totalDuration
-      lines.push(`  最安値: ¥${Math.round(seg.cheapestPrice).toLocaleString()}`)
+      lines.push(`  金額: ¥${Math.round(seg.cheapestPrice).toLocaleString()}`)
       if (carrier) lines.push(`  航空会社: ${carrier}`)
       if (dur > 0) lines.push(`  所要時間: ${formatDuration(dur)}`)
       lines.push(`  乗り継ぎ: ${stops === 0 ? '直行' : `${stops}回`}`)
@@ -89,14 +89,14 @@ export async function POST(request: NextRequest) {
   })
 
   const userMessage = [
-    'マルチシティ旅程の価格分析をお願いします。',
+    'マルチシティ旅程の分析をお願いします。以下は現在選択中の便の情報です。',
     '',
     ...segLines,
     '',
-    `合計金額: ¥${Math.round(result.totalPrice).toLocaleString()}`,
+    `選択中の合計金額: ¥${Math.round(result.totalPrice).toLocaleString()}`,
     `区間数: ${result.segments.length}`,
     '',
-    'この旅程の買い時を評価し、おすすめの乗り方と改善提案をお願いします。',
+    'この旅程を評価し、おすすめの乗り方と改善提案をお願いします。',
   ].join('\n')
 
   const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {

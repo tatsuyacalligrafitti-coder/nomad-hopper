@@ -175,11 +175,27 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
     setAnalysis(null)
     setAnalysisError('')
     setChatMessages([])
+
+    // Build a result that reflects the currently selected flight for each segment
+    const resultWithSelection: MultiCitySearchResult = {
+      ...result,
+      segments: result.segments.map((seg, idx) => {
+        const selIdx = selectedFlights[idx] ?? 0
+        const flight = (seg.top5Flights ?? [])[selIdx] ?? seg.cheapestFlight
+        return { ...seg, cheapestFlight: flight, cheapestPrice: flight?.totalPrice ?? seg.cheapestPrice }
+      }),
+      totalPrice: result.segments.reduce((sum, seg, idx) => {
+        const selIdx = selectedFlights[idx] ?? 0
+        const flight = (seg.top5Flights ?? [])[selIdx] ?? seg.cheapestFlight
+        return sum + (flight?.totalPrice ?? seg.cheapestPrice ?? 0)
+      }, 0),
+    }
+
     try {
       const res = await fetch('/api/ai-analysis-multi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ result, mode: mode ?? 'price' }),
+        body: JSON.stringify({ result: resultWithSelection, mode: mode ?? 'price' }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'AI分析に失敗しました')
