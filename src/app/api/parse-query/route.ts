@@ -102,17 +102,30 @@ function tryParseMultiCity(query: string): MultiCityParsedQuery | null {
   if (arrowParts.length >= 3) {
     const cities: string[] = []
     for (const part of arrowParts) {
-      const code = resolveCity(part)
+      // Strip embedded dates/punctuation before resolving city name
+      const cleanPart = part
+        .replace(/\d{1,2}月\d{1,2}日|\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2}/g, '')
+        .replace(/[,、\s]+/g, ' ')
+        .trim()
+      const code = resolveCity(cleanPart) ?? resolveCity(part.trim())
       if (code && (cities.length === 0 || cities[cities.length - 1] !== code)) {
         cities.push(code)
       }
     }
     if (cities.length >= 3) {
-      const baseDate = extractBaseDate(query)
+      const numSegs = cities.length - 1
+      // Use explicitly listed dates when count matches number of segments
+      const allDates = [...query.matchAll(/(\d{1,2}月\d{1,2}日|\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2})/g)]
+        .map(m => parseDate(m[0]))
+        .filter((d): d is string => d !== null)
+      const baseDate = allDates[0] ?? extractBaseDate(query)
+      const segDates: string[] = allDates.length >= numSegs
+        ? allDates.slice(0, numSegs)
+        : cities.slice(0, -1).map((_, i) => addDays(baseDate, i * 3))
       const segments: MultiCitySegmentQuery[] = cities.slice(0, -1).map((city, i) => ({
         origin: city,
         destination: cities[i + 1],
-        date: addDays(baseDate, i * 3),
+        date: segDates[i],
       }))
       return { type: 'multi-city', segments, passengers, cabinClass }
     }
@@ -234,6 +247,65 @@ function tryParseMultiCity(query: string): MultiCityParsedQuery | null {
         segments: buildKaeriSegments(origin, stops, baseDate, totalDays),
         passengers,
         cabinClass,
+      }
+    }
+  }
+
+  // ── Pattern 5: Date+city enumeration ─────────────────────────────────────
+  // Handles queries where each stop is expressed as "[date] + [city]":
+  //   "東京から7月3日にバンコク、7月8日にプラハ、7月14日に東京へ戻る"
+  //   "7月3日東京発バンコク経由、7月8日プラハへ、7月14日帰国"
+  {
+    const DATE_RX = /\d{1,2}月\d{1,2}日|\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2}/
+
+    // Identify departure origin: from "Xから" or "[date]X発"
+    let dcOrigin: string | null = null
+    const fromM = query.match(/^(.{1,15}?)から/)
+    if (fromM) dcOrigin = resolveCity(fromM[1].trim())
+    if (!dcOrigin) {
+      const hatsuM = query.match(/(?:\d{1,2}月\d{1,2}日|\d{1,2}\/\d{1,2})?(.{1,10}?)発/)
+      if (hatsuM?.[1]) dcOrigin = resolveCity(hatsuM[1].trim())
+    }
+
+    if (dcOrigin) {
+      const chunks = query.split(/[、，,。]/).filter(Boolean)
+      const pairs: Array<{ date: string; iata: string }> = []
+
+      for (const chunk of chunks) {
+        const dateM = chunk.match(DATE_RX)
+        if (!dateM) continue
+        const date = parseDate(dateM[0])
+        if (!date) continue
+
+        // Return-home keywords → return to origin
+        if (/帰国|帰り|帰る|戻る/.test(chunk)) {
+          pairs.push({ date, iata: dcOrigin })
+          continue
+        }
+
+        const cityText = chunk
+          .replace(DATE_RX, '')         // remove date token
+          .replace(/^.+?から/, '')      // strip "Xから" prefix
+          .replace(/^.+?発/, '')        // strip "X発" prefix (e.g. "東京発")
+          .replace(/経由.*$/, '')       // strip "経由..." suffix (keep city before it)
+          .replace(/[にへでは]\s*/g, '') // remove Japanese particles
+          .replace(/戻る|帰国|帰り|旅程/, '')
+          .trim()
+
+        const iata = cityText ? resolveCity(cityText) : null
+        if (iata) pairs.push({ date, iata })
+      }
+
+      if (pairs.length >= 2) {
+        const segments: MultiCitySegmentQuery[] = []
+        let prev = dcOrigin
+        for (const { date, iata } of pairs) {
+          segments.push({ origin: prev, destination: iata, date })
+          prev = iata
+        }
+        if (segments.length >= 2) {
+          return { type: 'multi-city', segments, passengers, cabinClass }
+        }
       }
     }
   }
