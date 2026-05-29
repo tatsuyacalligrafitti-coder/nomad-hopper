@@ -5,7 +5,7 @@ import { Loader2, Plane, Sparkles, Send } from 'lucide-react'
 import { IATA_JP_NAMES } from '@/lib/iata-names'
 import { aviasalesLink } from '@/lib/travelpayouts'
 import { getRouteEstimate, getPriceBadge, getPriceBadgeLabel, getPriceBadgeColor } from '@/lib/route-estimates'
-import type { MultiCitySearchResult, SearchMode } from '@/types'
+import type { MultiCitySearchResult, MultiCitySegmentResult, SearchMode } from '@/types'
 
 interface MultiCityAnalysis {
   verdict: string
@@ -67,6 +67,94 @@ function getNoFlightReason(origin: string, destination: string): string {
     return 'この区間の国際線データが限られています'
   }
   return 'この区間の便データが取得できませんでした'
+}
+
+interface NoFlightCardProps {
+  segIdx: number
+  seg: MultiCitySegmentResult
+  onRetrySegment: (segmentIndex: number, newDate?: string, newOrigin?: string, newDest?: string) => void
+}
+
+function NoFlightCard({ segIdx, seg, onRetrySegment }: NoFlightCardProps) {
+  const [pendingDate, setPendingDate] = useState(seg.date)
+  const [pendingOrigin, setPendingOrigin] = useState<string | undefined>(undefined)
+  const [pendingDest, setPendingDest] = useState<string | undefined>(undefined)
+
+  const originNearby = NEARBY_AIRPORTS[seg.origin.toUpperCase()] ?? []
+  const destNearby = NEARBY_AIRPORTS[seg.destination.toUpperCase()] ?? []
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gray-400">{formatDate(seg.date)} 出発</p>
+        <p className="text-xs text-gray-400">便が見つかりませんでした</p>
+      </div>
+      <p className="text-xs text-gray-400">{getNoFlightReason(seg.origin, seg.destination)}</p>
+
+      {/* Date picker */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-gray-400">日程を変更：</span>
+        <input
+          type="date"
+          value={pendingDate}
+          onChange={e => { if (e.target.value) setPendingDate(e.target.value) }}
+          className="text-xs border border-gray-200 rounded px-2 py-1 text-indigo-600 cursor-pointer focus:outline-none focus:border-indigo-300"
+        />
+      </div>
+
+      {/* Nearby airport suggestions */}
+      {(originNearby.length > 0 || destNearby.length > 0) && (
+        <div className="space-y-1">
+          {originNearby.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-gray-400">出発地を変更：</span>
+              {originNearby.map(ap => (
+                <button
+                  key={ap.code}
+                  onClick={() => setPendingOrigin(prev => prev === ap.code ? undefined : ap.code)}
+                  className={[
+                    'text-xs border rounded px-2 py-1 transition-colors',
+                    pendingOrigin === ap.code
+                      ? 'bg-indigo-100 border-indigo-400 text-indigo-700'
+                      : 'border-gray-200 hover:border-indigo-300 hover:text-indigo-600',
+                  ].join(' ')}
+                >
+                  {ap.name}（{ap.code}）
+                </button>
+              ))}
+            </div>
+          )}
+          {destNearby.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-gray-400">目的地を変更：</span>
+              {destNearby.map(ap => (
+                <button
+                  key={ap.code}
+                  onClick={() => setPendingDest(prev => prev === ap.code ? undefined : ap.code)}
+                  className={[
+                    'text-xs border rounded px-2 py-1 transition-colors',
+                    pendingDest === ap.code
+                      ? 'bg-indigo-100 border-indigo-400 text-indigo-700'
+                      : 'border-gray-200 hover:border-indigo-300 hover:text-indigo-600',
+                  ].join(' ')}
+                >
+                  {ap.name}（{ap.code}）
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Retry button */}
+      <button
+        onClick={() => onRetrySegment(segIdx, pendingDate, pendingOrigin, pendingDest)}
+        className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded px-3 py-1.5 transition-colors"
+      >
+        再検索する
+      </button>
+    </div>
+  )
 }
 
 
@@ -520,65 +608,12 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                               )}
                             </>
                           )
-                        })() : (
-                          <div className="space-y-2.5">
-                            <div className="flex items-center justify-between">
-                              <p className="text-xs text-gray-400">{formatDate(seg.date)} 出発</p>
-                              <p className="text-xs text-gray-400">便が見つかりませんでした</p>
-                            </div>
-                            <p className="text-xs text-gray-400">
-                              {getNoFlightReason(seg.origin, seg.destination)}
-                            </p>
-                            {/* Date picker */}
-                            {onRetrySegment && (
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-xs text-gray-400">日程を変更：</span>
-                                <input
-                                  type="date"
-                                  defaultValue={seg.date}
-                                  onChange={e => { if (e.target.value) onRetrySegment(ci, e.target.value) }}
-                                  className="text-xs border border-gray-200 rounded px-2 py-1 text-indigo-600 cursor-pointer focus:outline-none focus:border-indigo-300"
-                                />
-                              </div>
-                            )}
-                            {/* Nearby airport suggestions */}
-                            {onRetrySegment && (() => {
-                              const originNearby = NEARBY_AIRPORTS[seg.origin.toUpperCase()] ?? []
-                              const destNearby = NEARBY_AIRPORTS[seg.destination.toUpperCase()] ?? []
-                              if (originNearby.length === 0 && destNearby.length === 0) return null
-                              return (
-                                <div className="space-y-1">
-                                  {originNearby.length > 0 && (
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                      <span className="text-xs text-gray-400">出発地を変更：</span>
-                                      {originNearby.map(ap => (
-                                        <button
-                                          key={ap.code}
-                                          onClick={() => onRetrySegment(ci, undefined, ap.code)}
-                                          className="text-xs border border-gray-200 rounded px-2 py-1 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
-                                        >
-                                          {ap.name}（{ap.code}）
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {destNearby.length > 0 && (
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                      <span className="text-xs text-gray-400">目的地を変更：</span>
-                                      {destNearby.map(ap => (
-                                        <button
-                                          key={ap.code}
-                                          onClick={() => onRetrySegment(ci, undefined, undefined, ap.code)}
-                                          className="text-xs border border-gray-200 rounded px-2 py-1 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
-                                        >
-                                          {ap.name}（{ap.code}）
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            })()}
+                        })() : onRetrySegment ? (
+                          <NoFlightCard segIdx={ci} seg={seg} onRetrySegment={onRetrySegment} />
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-gray-400">{formatDate(seg.date)} 出発</p>
+                            <p className="text-xs text-gray-400">便が見つかりませんでした</p>
                           </div>
                         )}
                       </div>
