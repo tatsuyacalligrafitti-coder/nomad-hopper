@@ -36,6 +36,7 @@ interface Props {
   error?: string
   onReSearch?: (q: { origin: string; destination: string; departureDate: string; returnDate?: string }) => void
   initialSelectedFlights?: Record<number, number>
+  forcedSelections?: Record<number, number> | null
   rawQuery?: string
 }
 
@@ -74,7 +75,7 @@ function TypingDots() {
   )
 }
 
-export default function MultiCityResults({ result, isLoading, error, onReSearch, initialSelectedFlights, rawQuery }: Props) {
+export default function MultiCityResults({ result, isLoading, error, onReSearch, initialSelectedFlights, forcedSelections, rawQuery }: Props) {
   // ── AI analysis state ────────────────────────────────────────────────────────
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<MultiCityAnalysis | null>(null)
@@ -86,6 +87,20 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
   const [copied, setCopied] = useState(false)
   const [changeComment, setChangeComment] = useState<string | null>(null)
   const [isChangingFlight, setIsChangingFlight] = useState(false)
+
+  // Reset selections when a new search result arrives
+  useEffect(() => {
+    setSelectedFlights(initialSelectedFlights ?? {})
+    setChangeComment(null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result])
+
+  // Apply mode-driven forced selections from the parent
+  useEffect(() => {
+    if (forcedSelections != null) {
+      setSelectedFlights(forcedSelections)
+    }
+  }, [forcedSelections])
 
   const handleSelectFlight = async (segIdx: number, newFlightIdx: number, oldFlightIdx: number) => {
     if (!result) return

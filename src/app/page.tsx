@@ -9,7 +9,7 @@ import AIAnalysis from '@/components/AIAnalysis'
 import AIChat from '@/components/AIChat'
 import AIExploreChat from '@/components/AIExploreChat'
 import MultiCityResults from '@/components/MultiCityResults'
-import type { CategorizedFlights, SearchMode, SearchQuery, MultiCityParsedQuery, MultiCitySearchResult } from '@/types'
+import type { CategorizedFlights, SearchMode, SearchQuery, MultiCityParsedQuery, MultiCitySearchResult, FlightResult } from '@/types'
 
 interface ExploreParams {
   origin?: string
@@ -22,6 +22,20 @@ const MODE_HINTS: Record<SearchMode, string> = {
   balance: '価格と快適さのバランスで探します',
   elegant: 'ビジネスクラス専用・価格の安い順で表示',
   fastest: '最も早く到着する便を探します',
+}
+
+function selectByMode(flights: FlightResult[], mode: SearchMode): number {
+  if (flights.length === 0) return 0
+  let bestIdx = 0
+  let bestScore = Infinity
+  flights.forEach((f, i) => {
+    const score =
+      mode === 'fastest' ? f.totalDuration :
+      mode === 'balance' ? f.totalPrice + f.totalDuration * 80 :
+      f.totalPrice
+    if (score < bestScore) { bestScore = score; bestIdx = i }
+  })
+  return bestIdx
 }
 
 async function fetchFlights(query: SearchQuery): Promise<CategorizedFlights | null> {
@@ -77,6 +91,9 @@ export default function HomePage() {
   const [lastQuery, setLastQuery] = useState<SearchQuery | null>(null)
 
   const [multiCityResult, setMultiCityResult] = useState<MultiCitySearchResult | null>(null)
+  const [baseMultiCityResult, setBaseMultiCityResult] = useState<MultiCitySearchResult | null>(null)
+  const [lastMultiCityParsedQuery, setLastMultiCityParsedQuery] = useState<MultiCityParsedQuery | null>(null)
+  const [multiCityForcedSelections, setMultiCityForcedSelections] = useState<Record<number, number> | null>(null)
   const [isMultiCityLoading, setIsMultiCityLoading] = useState(false)
   const [multiCityError, setMultiCityError] = useState('')
   const [multiCityRawQuery, setMultiCityRawQuery] = useState<string | null>(null)
@@ -119,6 +136,50 @@ export default function HomePage() {
     const prevMode = mode
     setMode(newMode)
 
+    // ── Multi-city path ───────────────────────────────────────────────────────
+    if (multiCityResult) {
+      if (newMode === 'elegant') {
+        if (!lastMultiCityParsedQuery) return
+        setBaseMultiCityResult(multiCityResult)
+        setIsMultiCityLoading(true)
+        setMultiCityError('')
+        try {
+          const res = await fetch('/api/search-multi', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              segments: lastMultiCityParsedQuery.segments,
+              passengers: lastMultiCityParsedQuery.passengers,
+              cabinClass: 'business',
+            }),
+          })
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error ?? '検索に失敗しました')
+          setMultiCityResult(data)
+          const zeroSels: Record<number, number> = {}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data.segments.forEach((_: any, i: number) => { zeroSels[i] = 0 })
+          setMultiCityForcedSelections(zeroSels)
+        } catch (err) {
+          setMultiCityError(err instanceof Error ? err.message : '検索に失敗しました')
+        } finally {
+          setIsMultiCityLoading(false)
+        }
+      } else {
+        const sourceResult = (prevMode === 'elegant' && baseMultiCityResult) ? baseMultiCityResult : multiCityResult
+        if (prevMode === 'elegant' && baseMultiCityResult) {
+          setMultiCityResult(baseMultiCityResult)
+        }
+        const selections: Record<number, number> = {}
+        sourceResult.segments.forEach((seg, idx) => {
+          selections[idx] = selectByMode(seg.top5Flights ?? [], newMode)
+        })
+        setMultiCityForcedSelections(selections)
+      }
+      return
+    }
+
+    // ── Single-city path ──────────────────────────────────────────────────────
     if (!searched || !lastQuery) {
       searchBarRef.current?.focus()
       return
@@ -153,6 +214,8 @@ export default function HomePage() {
     setIsMultiCityLoading(true)
     setMultiCityError('')
     setMultiCityResult(null)
+    setMultiCityForcedSelections(null)
+    setLastMultiCityParsedQuery(query)
     if (rawQuery !== undefined) setMultiCityRawQuery(rawQuery)
     setCategorized(null)
     setSearched(false)
@@ -170,6 +233,7 @@ export default function HomePage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? '検索に失敗しました')
       setMultiCityResult(data)
+      setBaseMultiCityResult(data)
     } catch (err) {
       setMultiCityError(err instanceof Error ? err.message : '検索に失敗しました')
     } finally {
@@ -297,6 +361,7 @@ export default function HomePage() {
             isLoading={isMultiCityLoading}
             error={multiCityError}
             initialSelectedFlights={pendingSelections ?? undefined}
+            forcedSelections={multiCityForcedSelections}
             rawQuery={multiCityRawQuery ?? undefined}
             onReSearch={(q) => {
               const raw = `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`
