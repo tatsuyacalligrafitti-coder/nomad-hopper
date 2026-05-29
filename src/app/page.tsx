@@ -98,6 +98,7 @@ export default function HomePage() {
   const [multiCityError, setMultiCityError] = useState('')
   const [multiCityRawQuery, setMultiCityRawQuery] = useState<string | null>(null)
   const [retryingSegments, setRetryingSegments] = useState<Set<number>>(new Set())
+  const [multiCityWarning, setMultiCityWarning] = useState<{ message: string; consultMessage: string } | null>(null)
 
   const [exploreParams, setExploreParams] = useState<ExploreParams | null>(null)
   const [pendingSelections, setPendingSelections] = useState<Record<number, number> | null>(null)
@@ -279,6 +280,7 @@ export default function HomePage() {
     const date = newDate ?? seg.date
 
     setRetryingSegments(prev => new Set([...prev, segmentIndex]))
+    setMultiCityWarning(null)
     try {
       const res = await fetch('/api/search-multi', {
         method: 'POST',
@@ -300,6 +302,23 @@ export default function HomePage() {
         const newTotal = segs.reduce((sum, s) => sum + (s.cheapestPrice ?? 0), 0)
         return { ...prev, segments: segs, totalPrice: newTotal }
       })
+      // Check date conflict with the next segment
+      if (newDate) {
+        const nextSeg = multiCityResult.segments[segmentIndex + 1]
+        if (nextSeg) {
+          const diffDays = Math.floor(
+            (new Date(nextSeg.date).getTime() - new Date(newDate).getTime()) / 86400000
+          )
+          if (diffDays < 2) {
+            const segLabel = `区間${segmentIndex + 1}`
+            const nextLabel = `区間${segmentIndex + 2}`
+            setMultiCityWarning({
+              message: `${segLabel}の日程変更により、${nextLabel}まで${diffDays}日しかありません。AIに旅程全体の最適化を相談しますか？`,
+              consultMessage: `${segLabel}を${newDate}に変更しました。旅程全体の日程を最適化してください。`,
+            })
+          }
+        }
+      }
     } catch {
       // silently ignore
     } finally {
@@ -436,6 +455,9 @@ export default function HomePage() {
             rawQuery={multiCityRawQuery ?? undefined}
             onRetrySegment={retrySegment}
             retryingSegments={retryingSegments}
+            warningMessage={multiCityWarning?.message}
+            aiConsultMessage={multiCityWarning?.consultMessage}
+            onDismissWarning={() => setMultiCityWarning(null)}
             onReSearch={(q) => {
               const raw = `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`
               searchBarRef.current?.setQuery(raw)

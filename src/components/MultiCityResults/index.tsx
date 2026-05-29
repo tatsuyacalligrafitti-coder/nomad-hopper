@@ -41,6 +41,9 @@ interface Props {
   forcedSelections?: Record<number, number> | null
   mode?: SearchMode
   rawQuery?: string
+  warningMessage?: string | null
+  aiConsultMessage?: string | null
+  onDismissWarning?: () => void
 }
 
 const NEARBY_AIRPORTS: Record<string, { code: string; name: string }[]> = {
@@ -69,29 +72,30 @@ function getNoFlightReason(origin: string, destination: string): string {
   return 'この区間の便データが取得できませんでした'
 }
 
-interface NoFlightCardProps {
+interface SegmentEditPanelProps {
   segIdx: number
   seg: MultiCitySegmentResult
+  hasFlight: boolean
   onRetrySegment: (segmentIndex: number, newDate?: string, newOrigin?: string, newDest?: string) => void
 }
 
-function NoFlightCard({ segIdx, seg, onRetrySegment }: NoFlightCardProps) {
+function SegmentEditPanel({ segIdx, seg, hasFlight, onRetrySegment }: SegmentEditPanelProps) {
+  const [isOpen, setIsOpen] = useState(!hasFlight)
   const [pendingDate, setPendingDate] = useState(seg.date)
   const [pendingOrigin, setPendingOrigin] = useState<string | undefined>(undefined)
   const [pendingDest, setPendingDest] = useState<string | undefined>(undefined)
 
+  useEffect(() => {
+    setPendingDate(seg.date)
+    setPendingOrigin(undefined)
+    setPendingDest(undefined)
+  }, [seg.date, seg.origin, seg.destination])
+
   const originNearby = NEARBY_AIRPORTS[seg.origin.toUpperCase()] ?? []
   const destNearby = NEARBY_AIRPORTS[seg.destination.toUpperCase()] ?? []
 
-  return (
-    <div className="space-y-2.5">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400">{formatDate(seg.date)} 出発</p>
-        <p className="text-xs text-gray-400">便が見つかりませんでした</p>
-      </div>
-      <p className="text-xs text-gray-400">{getNoFlightReason(seg.origin, seg.destination)}</p>
-
-      {/* Date picker */}
+  const editContent = (
+    <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-gray-400">日程を変更：</span>
         <input
@@ -101,8 +105,6 @@ function NoFlightCard({ segIdx, seg, onRetrySegment }: NoFlightCardProps) {
           className="text-xs border border-gray-200 rounded px-2 py-1 text-indigo-600 cursor-pointer focus:outline-none focus:border-indigo-300"
         />
       </div>
-
-      {/* Nearby airport suggestions */}
       {(originNearby.length > 0 || destNearby.length > 0) && (
         <div className="space-y-1">
           {originNearby.length > 0 && (
@@ -145,14 +147,41 @@ function NoFlightCard({ segIdx, seg, onRetrySegment }: NoFlightCardProps) {
           )}
         </div>
       )}
-
-      {/* Retry button */}
       <button
         onClick={() => onRetrySegment(segIdx, pendingDate, pendingOrigin, pendingDest)}
         className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded px-3 py-1.5 transition-colors"
       >
         再検索する
       </button>
+    </div>
+  )
+
+  if (!hasFlight) {
+    return (
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400">{formatDate(seg.date)} 出発</p>
+          <p className="text-xs text-gray-400">便が見つかりませんでした</p>
+        </div>
+        <p className="text-xs text-gray-400">{getNoFlightReason(seg.origin, seg.destination)}</p>
+        {editContent}
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setIsOpen(v => !v)}
+        className="text-xs text-gray-400 hover:text-indigo-500 transition-colors"
+      >
+        {isOpen ? '▲ 閉じる' : '✏️ 日程・空港を変更'}
+      </button>
+      {isOpen && (
+        <div className="mt-2 pt-2 border-t border-gray-100">
+          {editContent}
+        </div>
+      )}
     </div>
   )
 }
@@ -193,11 +222,12 @@ function TypingDots() {
   )
 }
 
-export default function MultiCityResults({ result, isLoading, error, onReSearch, onRetrySegment, retryingSegments, initialSelectedFlights, forcedSelections, mode, rawQuery }: Props) {
+export default function MultiCityResults({ result, isLoading, error, onReSearch, onRetrySegment, retryingSegments, initialSelectedFlights, forcedSelections, mode, rawQuery, warningMessage, aiConsultMessage, onDismissWarning }: Props) {
   // ── AI analysis state ────────────────────────────────────────────────────────
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<MultiCityAnalysis | null>(null)
   const [analysisError, setAnalysisError] = useState('')
+  const [pendingConsultMsg, setPendingConsultMsg] = useState<string | null>(null)
 
   // ── Segment expand / flight selection state ──────────────────────────────────
   const [expandedSegments, setExpandedSegments] = useState<Set<number>>(new Set())
@@ -222,6 +252,16 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
       setChatMessages([])
     }
   }, [forcedSelections])
+
+  // Auto-send consultation message once analysis finishes loading
+  useEffect(() => {
+    if (analysis && pendingConsultMsg) {
+      const msg = pendingConsultMsg
+      setPendingConsultMsg(null)
+      sendChat(msg)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysis])
 
   const handleSelectFlight = async (segIdx: number, newFlightIdx: number, oldFlightIdx: number) => {
     if (!result) return
@@ -554,6 +594,10 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                                   {isExpanded ? '▲ 閉じる' : `▼ 他の便を見る（${allFlights.length - 1}件）`}
                                 </button>
                               )}
+                              {/* Universal segment edit panel */}
+                              {onRetrySegment && (
+                                <SegmentEditPanel segIdx={ci} seg={seg} hasFlight={true} onRetrySegment={onRetrySegment} />
+                              )}
 
                               {/* Expanded flight list — all alternatives with select button */}
                               {isExpanded && allFlights.length > 1 && (
@@ -609,7 +653,7 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                             </>
                           )
                         })() : onRetrySegment ? (
-                          <NoFlightCard segIdx={ci} seg={seg} onRetrySegment={onRetrySegment} />
+                          <SegmentEditPanel segIdx={ci} seg={seg} hasFlight={false} onRetrySegment={onRetrySegment} />
                         ) : (
                           <div className="flex items-center justify-between">
                             <p className="text-xs text-gray-400">{formatDate(seg.date)} 出発</p>
@@ -634,6 +678,41 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
             ) : (
               <p className="text-sm text-indigo-800 leading-relaxed">{changeComment}</p>
             )}
+          </div>
+        )}
+
+        {/* Date conflict warning card */}
+        {warningMessage && (
+          <div className="mt-3 bg-amber-50 border border-amber-200 rounded p-3 flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2 min-w-0">
+              <span className="shrink-0 text-amber-500 mt-0.5">⚠️</span>
+              <p className="text-xs text-amber-800 leading-relaxed">{warningMessage}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => {
+                  if (aiConsultMessage) {
+                    if (analysis) {
+                      sendChat(aiConsultMessage)
+                    } else {
+                      setPendingConsultMsg(aiConsultMessage)
+                      handleAnalyze()
+                    }
+                  }
+                  onDismissWarning?.()
+                }}
+                className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded transition-colors whitespace-nowrap"
+              >
+                AIに相談する
+              </button>
+              <button
+                onClick={() => onDismissWarning?.()}
+                className="text-xs text-amber-500 hover:text-amber-700 transition-colors"
+                aria-label="閉じる"
+              >
+                ✕
+              </button>
+            </div>
           </div>
         )}
 
