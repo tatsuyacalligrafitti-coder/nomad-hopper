@@ -362,6 +362,7 @@ export default function HomePage() {
             error={multiCityError}
             initialSelectedFlights={pendingSelections ?? undefined}
             forcedSelections={multiCityForcedSelections}
+            mode={mode}
             rawQuery={multiCityRawQuery ?? undefined}
             onReSearch={(q) => {
               const raw = `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`

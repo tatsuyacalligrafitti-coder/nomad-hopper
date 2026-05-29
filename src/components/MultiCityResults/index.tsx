@@ -5,7 +5,7 @@ import { Loader2, Plane, Sparkles, Send } from 'lucide-react'
 import { IATA_JP_NAMES } from '@/lib/iata-names'
 import { aviasalesLink } from '@/lib/travelpayouts'
 import { getRouteEstimate, getPriceBadge, getPriceBadgeLabel, getPriceBadgeColor } from '@/lib/route-estimates'
-import type { MultiCitySearchResult } from '@/types'
+import type { MultiCitySearchResult, SearchMode } from '@/types'
 
 interface MultiCityAnalysis {
   verdict: string
@@ -37,6 +37,7 @@ interface Props {
   onReSearch?: (q: { origin: string; destination: string; departureDate: string; returnDate?: string }) => void
   initialSelectedFlights?: Record<number, number>
   forcedSelections?: Record<number, number> | null
+  mode?: SearchMode
   rawQuery?: string
 }
 
@@ -75,7 +76,7 @@ function TypingDots() {
   )
 }
 
-export default function MultiCityResults({ result, isLoading, error, onReSearch, initialSelectedFlights, forcedSelections, rawQuery }: Props) {
+export default function MultiCityResults({ result, isLoading, error, onReSearch, initialSelectedFlights, forcedSelections, mode, rawQuery }: Props) {
   // ── AI analysis state ────────────────────────────────────────────────────────
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<MultiCityAnalysis | null>(null)
@@ -95,10 +96,13 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result])
 
-  // Apply mode-driven forced selections from the parent
+  // Apply mode-driven forced selections; also close any open AI analysis
   useEffect(() => {
     if (forcedSelections != null) {
       setSelectedFlights(forcedSelections)
+      setAnalysis(null)
+      setAnalysisError('')
+      setChatMessages([])
     }
   }, [forcedSelections])
 
@@ -175,7 +179,7 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
       const res = await fetch('/api/ai-analysis-multi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ result }),
+        body: JSON.stringify({ result, mode: mode ?? 'price' }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'AI分析に失敗しました')

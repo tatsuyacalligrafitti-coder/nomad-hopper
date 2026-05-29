@@ -1,7 +1,30 @@
 import { NextRequest } from 'next/server'
-import type { MultiCitySearchResult } from '@/types'
+import type { MultiCitySearchResult, SearchMode } from '@/types'
 
-function buildSystemPrompt(): string {
+const MARKET_RATES = `各区間の相場知識：
+- 東京↔バンコク エコノミー往復：6〜12万円、ビジネス：20〜40万円
+- 東京↔ナイロビ エコノミー往復：20〜35万円
+- 東京↔ロンドン エコノミー往復：10〜18万円、ビジネス：40〜80万円
+- バンコク↔ナイロビ エコノミー片道：5〜15万円
+- バンコク↔ロンドン エコノミー片道：5〜12万円
+- シンガポール↔欧州 エコノミー片道：5〜10万円
+- 東京↔ニューヨーク エコノミー往復：12〜22万円`
+
+const MODE_INSTRUCTIONS: Record<SearchMode, string> = {
+  price: `【評価基準：価格優先】
+安さを最優先に評価してください。相場より安ければ◎今すぐ、相場内なら△様子見、相場より高ければ✗待つべきとしてください。所要時間や乗り継ぎ回数は二次的な情報として添える程度にとどめてください。`,
+
+  fastest: `【評価基準：最速】
+所要時間の短さを最優先に評価してください。乗り継ぎが少なく総移動時間が短ければ、価格が高くても◎今すぐとしてください。時短が実現できていなければ✗待つべきとしてください。価格は二次的な判断材料です。`,
+
+  balance: `【評価基準：バランス】
+価格と所要時間のバランスを評価してください。両方が妥当であれば◎今すぐ、どちらかが極端に悪ければ△様子見〜✗待つべきとしてください。一方だけが優れていても過大評価しないでください。`,
+
+  elegant: `【評価基準：優雅・ビジネスクラス】
+これはビジネスクラスの旅程です。エコノミー相場と比較してはいけません。ビジネスクラスの相場（東京↔バンコク往復30〜60万、東京↔ナイロビ往復80〜150万、東京↔ロンドン往復40〜80万程度）と比較し、ビジネスクラスとして妥当な価格か、快適性に見合うかで評価してください。高額であること自体を否定的に扱わないでください。`,
+}
+
+function buildSystemPrompt(mode: SearchMode): string {
   const today = new Date().toLocaleDateString('ja-JP', {
     year: 'numeric', month: 'long', day: 'numeric',
   })
@@ -11,27 +34,23 @@ function buildSystemPrompt(): string {
 
 {
   "verdict": "◎今すぐ",
-  "reason": "全体的な価格評価と買い時の判断を2〜3文で",
+  "reason": "全体的な評価と買い時の判断を2〜3文で",
   "recommended": "最もおすすめの区間の組み合わせや乗り方を具体的に説明",
   "tip": "具体的な改善提案（逆ルート・日程変更・航空会社変更など。提案がない場合はnull）"
 }
 
 verdictは必ず「◎今すぐ」「△様子見」「✗待つべき」のいずれかにしてください。
 
-各区間の相場知識も活用して判断してください：
-- 東京↔バンコク エコノミー往復：6〜12万円、ビジネス：20〜40万円
-- 東京↔ナイロビ エコノミー往復：20〜35万円
-- 東京↔ロンドン エコノミー往復：10〜18万円、ビジネス：40〜80万円
-- バンコク↔ナイロビ エコノミー片道：5〜15万円
-- バンコク↔ロンドン エコノミー片道：5〜12万円
-- シンガポール↔欧州 エコノミー片道：5〜10万円
-- 東京↔ニューヨーク エコノミー往復：12〜22万円
+${MODE_INSTRUCTIONS[mode]}
+
+${MARKET_RATES}
 
 逆ルートの可能性、滞在日数の調整、エチオピア航空・カタール航空・エミレーツ航空などの代替航空会社も提案してください。`
 }
 
 interface RequestBody {
   result: MultiCitySearchResult
+  mode?: SearchMode
 }
 
 function formatDuration(minutes: number): string {
@@ -42,7 +61,7 @@ function formatDuration(minutes: number): string {
 
 export async function POST(request: NextRequest) {
   const body: RequestBody = await request.json()
-  const { result } = body
+  const { result, mode = 'price' } = body
 
   if (!result?.segments?.length) {
     return Response.json({ error: '旅程データが不足しています' }, { status: 400 })
@@ -90,7 +109,7 @@ export async function POST(request: NextRequest) {
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 1000,
-      system: buildSystemPrompt(),
+      system: buildSystemPrompt(mode),
       messages: [{ role: 'user', content: userMessage }],
     }),
   })
