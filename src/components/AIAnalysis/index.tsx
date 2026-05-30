@@ -254,15 +254,6 @@ export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
             </div>
           )}
 
-          <button
-            onClick={analyze}
-            disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg px-4 py-3 mt-4 flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
-          >
-            {loading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-            再分析する
-          </button>
-
           {/* Inline chat */}
           <div className="border-t border-indigo-200 pt-4 space-y-3">
             <p className="text-xs font-semibold text-indigo-600">この分析についてさらに質問する</p>
