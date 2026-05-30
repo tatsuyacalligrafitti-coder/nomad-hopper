@@ -314,6 +314,22 @@ export default function HomePage() {
             const segLabel = `区間${segmentIndex + 1}`
             const nextLabel = `区間${segmentIndex + 2}`
             // Build itinerary summary for AI context
+            const AIRPORT_NAMES: Record<string, string> = {
+              HND:'東京羽田', NRT:'東京成田', KIX:'大阪関西',
+              ITM:'大阪伊丹', NGO:'名古屋', FUK:'福岡',
+              CTS:'札幌', OKA:'那覇', BKK:'バンコク',
+              ICN:'ソウル仁川', GMP:'ソウル金浦',
+              SIN:'シンガポール', KUL:'クアラルンプール',
+              DPS:'バリ', MNL:'マニラ', HAN:'ハノイ',
+              SGN:'ホーチミン', NBO:'ナイロビ',
+              DXB:'ドバイ', LHR:'ロンドン', CDG:'パリ',
+              JFK:'ニューヨーク', LAX:'ロサンゼルス',
+              SYD:'シドニー', PRG:'プラハ',
+            }
+            const apName = (code: string) => {
+              const name = AIRPORT_NAMES[code.toUpperCase()]
+              return name ? `${name}(${code})` : code
+            }
             const summaryLines: string[] = ['旅程：']
             multiCityResult.segments.forEach((seg, i) => {
               const segDate = i === segmentIndex ? newDate : seg.date
@@ -322,7 +338,7 @@ export default function HomePage() {
               const price = segResult.cheapestPrice != null
                 ? `¥${Math.round(segResult.cheapestPrice).toLocaleString()}`
                 : '便なし'
-              summaryLines.push(`区間${i + 1}: ${seg.origin}→${seg.destination} ${segDate} ${airline} ${price}`)
+              summaryLines.push(`区間${i + 1}: ${apName(seg.origin)}→${apName(seg.destination)} ${segDate} ${airline} ${price}`)
             })
             const totalForSummary = multiCityResult.segments.reduce((sum, seg, i) => {
               const p = i === segmentIndex ? (newSeg.cheapestPrice ?? 0) : (seg.cheapestPrice ?? 0)

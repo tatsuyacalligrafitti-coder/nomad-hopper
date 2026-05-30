@@ -62,6 +62,11 @@ const NEARBY_AIRPORTS: Record<string, { code: string; name: string }[]> = {
   LON: [{code:'LHR',name:'ヒースロー'},{code:'LGW',name:'ガトウィック'},{code:'STN',name:'スタンステッド'}],
   PAR: [{code:'CDG',name:'シャルルドゴール'},{code:'ORY',name:'オルリー'}],
   SYD: [{code:'MEL',name:'メルボルン'},{code:'BNE',name:'ブリスベン'}],
+  CTS: [{code:'HND',name:'羽田'},{code:'NRT',name:'成田'}],
+  SDJ: [{code:'HND',name:'羽田'},{code:'NRT',name:'成田'}],
+  KOJ: [{code:'FUK',name:'福岡'},{code:'OIT',name:'大分'}],
+  OKA: [{code:'ISG',name:'石垣'},{code:'MMY',name:'宮古島'}],
+  HIJ: [{code:'UKB',name:'神戸'},{code:'KIX',name:'関西国際'}],
 }
 
 const JAPAN_AIRPORTS = new Set(['NRT', 'HND', 'KIX', 'ITM', 'NGO', 'NKM', 'OSA', 'FUK', 'CTS', 'OKA', 'SDJ', 'KMJ', 'KOJ'])
