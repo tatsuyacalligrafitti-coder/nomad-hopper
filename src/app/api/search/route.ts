@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { searchSkyscanner } from '@/lib/skyscanner'
+import { searchAllProviders } from '@/lib/flight-search-orchestrator'
 import type { FlightResult, SearchQuery, CategorizedFlights } from '@/types'
 
 function balanceScore(
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const flights = await searchSkyscanner(query)
+    const flights = await searchAllProviders(query)
     const categorized = categorize(flights)
     return Response.json({ categorized, total: flights.length })
   } catch (err) {
