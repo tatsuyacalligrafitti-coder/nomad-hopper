@@ -6,6 +6,7 @@ import { IATA_JP_NAMES } from '@/lib/iata-names'
 import { aviasalesLink } from '@/lib/travelpayouts'
 import { getRouteEstimate, getPriceBadge, getPriceBadgeLabel, getPriceBadgeColor } from '@/lib/route-estimates'
 import type { MultiCitySearchResult, MultiCitySegmentResult, SearchMode } from '@/types'
+import AlertModal from '@/components/AlertModal'
 
 interface MultiCityAnalysis {
   verdict: string
@@ -225,6 +226,7 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
 
   // ── Segment edit panel open/close state ──────────────────────────────────────
   const [editOpenSegments, setEditOpenSegments] = useState<Set<number>>(new Set())
+  const [alertSegmentIdx, setAlertSegmentIdx] = useState<number | null>(null)
   const toggleEditPanel = (idx: number) => {
     setEditOpenSegments(prev => {
       const next = new Set(prev)
@@ -587,6 +589,12 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                                         📅 日程・空港変更
                                       </button>
                                     )}
+                                    <button
+                                      onClick={() => setAlertSegmentIdx(ci)}
+                                      className="text-xs text-gray-400 border border-gray-200 rounded px-2 py-0.5 hover:border-indigo-300 hover:text-indigo-500 transition-colors w-full"
+                                    >
+                                      🔔 価格アラート
+                                    </button>
                                   </div>
                                 </div>
                               </div>
@@ -961,5 +969,14 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
         )}
       </div>
     </div>
+
+    {/* Price alert modal for segment flights */}
+    {alertSegmentIdx !== null && (() => {
+      const alertSeg = result.segments[alertSegmentIdx]
+      const alertFlight = (alertSeg?.top5Flights ?? [])[selectedFlights[alertSegmentIdx] ?? 0] ?? alertSeg?.cheapestFlight ?? null
+      return alertFlight
+        ? <AlertModal flight={alertFlight} onClose={() => setAlertSegmentIdx(null)} />
+        : null
+    })()}
   )
 }

@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { Plane, Clock, Zap } from 'lucide-react'
 import type { CategorizedFlights, FlightResult, SearchQuery } from '@/types'
 import ExternalLinks from '@/components/ExternalLinks'
+import AlertModal from '@/components/AlertModal'
 
 interface Props {
   categorized: CategorizedFlights | null
@@ -41,6 +43,7 @@ function formatDepDate(iso: string): string {
 
 // ─── Flight card ───────────────────────────────────────────────────────────────
 function TpCard({ flight, badge, showBusinessBadge }: { flight: FlightResult; badge?: string; showBusinessBadge?: boolean }) {
+  const [alertOpen, setAlertOpen] = useState(false)
   const seg = flight.segments[0]
   const hasAirline = !!seg.carrierCode
   const airlineName = hasAirline
@@ -48,89 +51,101 @@ function TpCard({ flight, badge, showBusinessBadge }: { flight: FlightResult; ba
     : (seg.carrierName || '各社最安値')
 
   return (
-    <a
-      href={flight.bookingLink}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={[
-        'flex flex-col sm:flex-row sm:items-center sm:justify-between',
-        'gap-4 rounded-2xl border bg-white px-5 py-5',
-        'shadow-sm hover:shadow-md transition-all group',
-        badge ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-gray-200',
-      ].join(' ')}
-    >
-      <div className="flex items-center gap-3 min-w-0">
-        {hasAirline ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={airlineLogoUrl(seg.carrierCode)}
-            alt={airlineName}
-            className="w-9 h-9 rounded-full object-contain bg-gray-50 shrink-0"
-            onError={(e) => {
-              const t = e.currentTarget
-              t.style.display = 'none'
-              const span = document.createElement('span')
-              span.textContent = '✈️'
-              span.className = 'text-3xl shrink-0'
-              t.parentNode?.insertBefore(span, t)
-            }}
-          />
-        ) : (
-          <span className="text-3xl shrink-0" aria-hidden="true">🌐</span>
-        )}
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-bold text-gray-900 text-base leading-tight">{airlineName}</p>
-            {showBusinessBadge && (
-              <span className="text-xs bg-amber-500 text-white font-bold rounded-full px-2 py-0.5 shrink-0">
-                ビジネスクラス
-              </span>
-            )}
-            {badge && (
-              <span className="text-xs bg-indigo-600 text-white font-bold rounded-full px-2 py-0.5 shrink-0">
-                {badge}
-              </span>
-            )}
-          </div>
-          {hasAirline && seg.flightNumber && (
-            <p className="text-xs text-gray-400 mt-0.5">{seg.flightNumber}</p>
+    <>
+      <div
+        className={[
+          'flex flex-col sm:flex-row sm:items-center sm:justify-between',
+          'gap-4 rounded-2xl border bg-white px-5 py-5',
+          'shadow-sm hover:shadow-md transition-all',
+          badge ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-gray-200',
+        ].join(' ')}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          {hasAirline ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={airlineLogoUrl(seg.carrierCode)}
+              alt={airlineName}
+              className="w-9 h-9 rounded-full object-contain bg-gray-50 shrink-0"
+              onError={(e) => {
+                const t = e.currentTarget
+                t.style.display = 'none'
+                const span = document.createElement('span')
+                span.textContent = '✈️'
+                span.className = 'text-3xl shrink-0'
+                t.parentNode?.insertBefore(span, t)
+              }}
+            />
+          ) : (
+            <span className="text-3xl shrink-0" aria-hidden="true">🌐</span>
           )}
-          <p className="text-xs text-gray-400 mt-1">{formatDepDate(seg.departingAt)}</p>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t border-gray-100 pt-3 sm:border-0 sm:pt-0">
-        <div>
-          <p className="text-xs text-gray-400 leading-none mb-1">往復合計</p>
-          <p className="text-2xl font-bold text-indigo-700 tabular-nums leading-none">
-            ¥{Math.round(flight.totalPrice).toLocaleString()}
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            片道目安 ¥{Math.round(flight.totalPrice / 2).toLocaleString()}〜
-          </p>
-          <div className="flex items-center gap-2 mt-1.5 text-xs flex-wrap">
-            {flight.stops === 0 ? (
-              <span className="flex items-center gap-0.5 text-blue-600 font-semibold">
-                <Zap size={11} />直行便
-              </span>
-            ) : flight.stops != null ? (
-              <span className="text-orange-500 font-medium">
-                {flight.stops}回乗り継ぎ
-              </span>
-            ) : null}
-            {flight.totalDuration > 0 && (
-              <span className="flex items-center gap-0.5 text-gray-500">
-                <Clock size={11} />{formatDurationJa(flight.totalDuration)}
-              </span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-bold text-gray-900 text-base leading-tight">{airlineName}</p>
+              {showBusinessBadge && (
+                <span className="text-xs bg-amber-500 text-white font-bold rounded-full px-2 py-0.5 shrink-0">
+                  ビジネスクラス
+                </span>
+              )}
+              {badge && (
+                <span className="text-xs bg-indigo-600 text-white font-bold rounded-full px-2 py-0.5 shrink-0">
+                  {badge}
+                </span>
+              )}
+            </div>
+            {hasAirline && seg.flightNumber && (
+              <p className="text-xs text-gray-400 mt-0.5">{seg.flightNumber}</p>
             )}
+            <p className="text-xs text-gray-400 mt-1">{formatDepDate(seg.departingAt)}</p>
           </div>
         </div>
 
-        <span className="bg-green-500 group-hover:bg-green-600 text-white font-bold rounded-xl px-6 py-3 transition-colors whitespace-nowrap text-sm shrink-0">
-          今すぐ予約 →
-        </span>
+        <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t border-gray-100 pt-3 sm:border-0 sm:pt-0">
+          <div>
+            <p className="text-xs text-gray-400 leading-none mb-1">往復合計</p>
+            <p className="text-2xl font-bold text-indigo-700 tabular-nums leading-none">
+              ¥{Math.round(flight.totalPrice).toLocaleString()}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              片道目安 ¥{Math.round(flight.totalPrice / 2).toLocaleString()}〜
+            </p>
+            <div className="flex items-center gap-2 mt-1.5 text-xs flex-wrap">
+              {flight.stops === 0 ? (
+                <span className="flex items-center gap-0.5 text-blue-600 font-semibold">
+                  <Zap size={11} />直行便
+                </span>
+              ) : flight.stops != null ? (
+                <span className="text-orange-500 font-medium">
+                  {flight.stops}回乗り継ぎ
+                </span>
+              ) : null}
+              {flight.totalDuration > 0 && (
+                <span className="flex items-center gap-0.5 text-gray-500">
+                  <Clock size={11} />{formatDurationJa(flight.totalDuration)}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setAlertOpen(true)}
+              className="mt-1.5 text-xs text-gray-400 hover:text-indigo-500 flex items-center gap-1 transition-colors"
+            >
+              🔔 価格アラート登録
+            </button>
+          </div>
+
+          <a
+            href={flight.bookingLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl px-6 py-3 transition-colors whitespace-nowrap text-sm shrink-0"
+          >
+            今すぐ予約 →
+          </a>
+        </div>
       </div>
-    </a>
+
+      {alertOpen && <AlertModal flight={flight} onClose={() => setAlertOpen(false)} />}
+    </>
   )
 }
 

@@ -52,6 +52,7 @@ export interface AlertRequest {
   lineToken?: string
   flightId: string
   targetPrice: number
+  currentPrice?: number
   origin: string
   destination: string
   departureDate: string

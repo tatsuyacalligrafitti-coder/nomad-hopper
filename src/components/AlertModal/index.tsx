@@ -48,6 +48,7 @@ export default function AlertModal({ flight, onClose }: Props) {
           lineToken: method === 'line' ? lineToken : undefined,
           flightId: flight.id,
           targetPrice,
+          currentPrice: Math.round(flight.totalPrice),
           origin: firstSeg.origin,
           destination: lastSeg.destination,
           departureDate: firstSeg.departingAt.split('T')[0],
