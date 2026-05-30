@@ -17,12 +17,14 @@ function buildSystemPrompt(): string {
 
 verdictは必ず「◎今すぐ」「△様子見」「✗待つべき」のいずれかにしてください。
 
-次に、関連する検索提案があれば最大3件（なければ空配列）：
+次に、必ず以下の<search_suggestions>タグを出力すること（提案がない場合も空配列で出力すること）：
 <search_suggestions>
 [
   {"label": "ボタンに表示するラベル", "airline": "航空会社名", "query": "チャットに送る質問文"}
 ]
 </search_suggestions>
+
+提案例：同じ区間で別の航空会社、前後1週間の価格帯、直行便のみの選択肢など。最大3件。
 
 東京→バンコクの平均価格帯（エコノミー往復6〜12万円、ビジネス20〜40万円）などの相場知識も活用して判断してください。`
 }
@@ -99,7 +101,7 @@ export async function POST(request: NextRequest) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1000,
+      max_tokens: 1500,
       system: buildSystemPrompt(),
       messages: [{ role: 'user', content: userMessage }],
     }),
@@ -115,6 +117,7 @@ export async function POST(request: NextRequest) {
 
   const claudeData = await claudeRes.json()
   const text: string = claudeData.content?.[0]?.text ?? ''
+  console.log('[ai-analysis] raw response:', text)
 
   // Split before <search_suggestions> so greedy JSON match doesn't bleed into the tag
   const [jsonPart, suggestionsRaw] = text.split('<search_suggestions>')

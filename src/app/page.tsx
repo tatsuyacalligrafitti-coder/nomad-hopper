@@ -203,15 +203,30 @@ export default function HomePage() {
           setIsMultiCityLoading(false)
         }
       } else if (baseMultiCityResult) {
-        // Use reference comparison instead of prevMode to detect if we're
-        // currently showing business (elegant) results.
-        if (multiCityResult !== baseMultiCityResult) {
-          setMultiCityResult(baseMultiCityResult)
-        }
         const selections: Record<number, number> = {}
-        baseMultiCityResult.segments.forEach((seg, idx) => {
-          selections[idx] = selectByMode(seg.top5Flights ?? [], newMode)
-        })
+        if (newMode === 'fastest') {
+          const fastestResult: MultiCitySearchResult = {
+            ...baseMultiCityResult,
+            segments: baseMultiCityResult.segments.map(seg => {
+              const top5 = [...(seg.top5Flights ?? [])].sort((a, b) => {
+                const sd = (a.stops ?? 0) - (b.stops ?? 0)
+                return sd !== 0 ? sd : (a.totalDuration || 0) - (b.totalDuration || 0)
+              })
+              return { ...seg, top5Flights: top5, cheapestFlight: top5[0] ?? null, cheapestPrice: top5[0]?.totalPrice ?? seg.cheapestPrice }
+            }),
+          }
+          setMultiCityResult(fastestResult)
+          fastestResult.segments.forEach((_, idx) => { selections[idx] = 0 })
+        } else {
+          // Use reference comparison instead of prevMode to detect if we're
+          // currently showing business (elegant) results.
+          if (multiCityResult !== baseMultiCityResult) {
+            setMultiCityResult(baseMultiCityResult)
+          }
+          baseMultiCityResult.segments.forEach((seg, idx) => {
+            selections[idx] = selectByMode(seg.top5Flights ?? [], newMode)
+          })
+        }
         setMultiCityForcedSelections(selections)
       } else if (lastMultiCityParsedQuery) {
         // Fallback: no economy base data — re-fetch with original cabin class
