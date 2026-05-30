@@ -26,6 +26,14 @@ function computeScore(
 export function sortFlights(flights: FlightResult[], mode: SearchMode): FlightResult[] {
   if (flights.length === 0) return []
 
+  if (mode === 'fastest') {
+    return [...flights].sort((a, b) => {
+      const stopDiff = (a.stops ?? 0) - (b.stops ?? 0)
+      if (stopDiff !== 0) return stopDiff
+      return (a.totalDuration || 0) - (b.totalDuration || 0)
+    })
+  }
+
   const prices = flights.map(f => f.totalPrice)
   const durations = flights.map(f => f.totalDuration || 0)
   const minP = Math.min(...prices), maxP = Math.max(...prices)

@@ -27,11 +27,22 @@ const MODE_HINTS: Record<SearchMode, string> = {
 
 function selectByMode(flights: FlightResult[], mode: SearchMode): number {
   if (flights.length === 0) return 0
+
+  if (mode === 'fastest') {
+    let bestIdx = 0
+    for (let i = 1; i < flights.length; i++) {
+      const curr = flights[i], best = flights[bestIdx]
+      const stopDiff = (curr.stops ?? 0) - (best.stops ?? 0)
+      if (stopDiff < 0) { bestIdx = i; continue }
+      if (stopDiff === 0 && (curr.totalDuration || 0) < (best.totalDuration || 0)) bestIdx = i
+    }
+    return bestIdx
+  }
+
   let bestIdx = 0
   let bestScore = Infinity
   flights.forEach((f, i) => {
     const score =
-      mode === 'fastest' ? f.totalDuration :
       mode === 'balance' ? f.totalPrice + f.totalDuration * 80 :
       f.totalPrice
     if (score < bestScore) { bestScore = score; bestIdx = i }
