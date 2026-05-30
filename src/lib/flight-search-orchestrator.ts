@@ -12,14 +12,22 @@ const providers: FlightProvider[] = [
 
 export async function searchAllProviders(query: SearchQuery): Promise<FlightResult[]> {
   const settled = await Promise.allSettled(
-    providers.map((p) => p.search(query))
+    providers.map(async (p) => {
+      console.log(`[${p.name}] 検索開始`)
+      const results = await p.search(query)
+      console.log(`[${p.name}] ${results.length}件取得`)
+      return results
+    })
   )
 
   const groups = settled.flatMap((result, i) => {
     if (result.status === 'fulfilled') return [result.value]
-    console.warn(`[orchestrator] provider "${providers[i].name}" failed:`, result.reason)
+    const err = result.reason
+    console.warn(`[${providers[i].name}] 失敗:`, err instanceof Error ? err.message : String(err))
     return []
   })
 
-  return mergeFlights(groups).map((f) => f.raw)
+  const merged = mergeFlights(groups)
+  console.log(`[orchestrator] 合計${merged.length}件`)
+  return merged.map((f) => f.raw)
 }

@@ -90,7 +90,7 @@ export class DuffelProvider implements FlightProvider {
   async search(query: SearchQuery): Promise<NormalizedFlight[]> {
     const apiKey = process.env.DUFFEL_API_KEY
     if (!apiKey) {
-      console.warn('[duffel] DUFFEL_API_KEY not set — skipping')
+      console.warn('[duffel] DUFFEL_API_KEY未設定、スキップ')
       return []
     }
 
@@ -99,6 +99,7 @@ export class DuffelProvider implements FlightProvider {
       () => ({ type: 'adult' as const }),
     )
 
+    console.log('[duffel] API呼び出し開始')
     const res = await fetch(
       'https://api.duffel.com/air/offer_requests?return_offers=true',
       {
@@ -132,6 +133,7 @@ export class DuffelProvider implements FlightProvider {
 
     const json = await res.json() as { data: { offers?: DuffelOffer[] } }
     const offers = json.data?.offers ?? []
+    console.log(`[duffel] ${offers.length}件のオファー取得`)
 
     return offers.map((offer) => {
       const result = offerToFlightResult(offer, query)
