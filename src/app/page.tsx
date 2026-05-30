@@ -6,7 +6,7 @@ import SearchBar, { type SearchBarHandle } from '@/components/SearchBar'
 import ModeSelector from '@/components/ModeSelector'
 import FlightResults from '@/components/FlightResults'
 import AIAnalysis from '@/components/AIAnalysis'
-import AIChat from '@/components/AIChat'
+import AIChat, { type AIChatHandle } from '@/components/AIChat'
 import AIExploreChat from '@/components/AIExploreChat'
 import MultiCityResults from '@/components/MultiCityResults'
 import type { CategorizedFlights, SearchMode, SearchQuery, MultiCityParsedQuery, MultiCitySearchResult, FlightResult } from '@/types'
@@ -104,6 +104,7 @@ export default function HomePage() {
   const [pendingSelections, setPendingSelections] = useState<Record<number, number> | null>(null)
 
   const searchBarRef = useRef<SearchBarHandle>(null)
+  const aiChatRef = useRef<AIChatHandle>(null)
 
   // Auto-search from shared URL (?q=...&sel=...)
   useEffect(() => {
@@ -458,6 +459,7 @@ export default function HomePage() {
             warningMessage={multiCityWarning?.message}
             aiConsultMessage={multiCityWarning?.consultMessage}
             onDismissWarning={() => setMultiCityWarning(null)}
+            onOpenFloatingChat={(msg) => aiChatRef.current?.openWithMessage(msg)}
             onReSearch={(q) => {
               const raw = `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`
               searchBarRef.current?.setQuery(raw)
@@ -493,7 +495,7 @@ export default function HomePage() {
       </footer>
 
       {/* AI Chat — fixed position, always rendered */}
-      <AIChat query={lastQuery} categorized={categorized} />
+      <AIChat ref={aiChatRef} query={lastQuery} categorized={categorized} />
     </div>
   )
 }

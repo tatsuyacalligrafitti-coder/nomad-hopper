@@ -1,8 +1,12 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { MessageCircle, X, Send, Plane } from 'lucide-react'
 import type { CategorizedFlights, SearchQuery } from '@/types'
+
+export interface AIChatHandle {
+  openWithMessage: (message: string) => void
+}
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -58,7 +62,7 @@ function TypingDots() {
   )
 }
 
-export default function AIChat({ query, categorized }: Props) {
+const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categorized }, ref) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -104,6 +108,13 @@ export default function AIChat({ query, categorized }: Props) {
       setLoading(false)
     }
   }
+
+  useImperativeHandle(ref, () => ({
+    openWithMessage: (message: string) => {
+      setIsOpen(true)
+      send(message)
+    },
+  }))
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -238,4 +249,6 @@ export default function AIChat({ query, categorized }: Props) {
       </button>
     </>
   )
-}
+})
+
+export default AIChat

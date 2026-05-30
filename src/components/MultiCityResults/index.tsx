@@ -44,6 +44,7 @@ interface Props {
   warningMessage?: string | null
   aiConsultMessage?: string | null
   onDismissWarning?: () => void
+  onOpenFloatingChat?: (message: string) => void
 }
 
 const NEARBY_AIRPORTS: Record<string, { code: string; name: string }[]> = {
@@ -80,7 +81,6 @@ interface SegmentEditPanelProps {
 }
 
 function SegmentEditPanel({ segIdx, seg, hasFlight, onRetrySegment }: SegmentEditPanelProps) {
-  const [isOpen, setIsOpen] = useState(!hasFlight)
   const [pendingDate, setPendingDate] = useState(seg.date)
   const [pendingOrigin, setPendingOrigin] = useState<string | undefined>(undefined)
   const [pendingDest, setPendingDest] = useState<string | undefined>(undefined)
@@ -170,18 +170,8 @@ function SegmentEditPanel({ segIdx, seg, hasFlight, onRetrySegment }: SegmentEdi
   }
 
   return (
-    <div className="mt-2">
-      <button
-        onClick={() => setIsOpen(v => !v)}
-        className="text-xs text-gray-400 hover:text-indigo-500 transition-colors"
-      >
-        {isOpen ? '▲ 閉じる' : '✏️ 日程・空港を変更'}
-      </button>
-      {isOpen && (
-        <div className="mt-2 pt-2 border-t border-gray-100">
-          {editContent}
-        </div>
-      )}
+    <div className="mt-2 pt-2 border-t border-gray-100">
+      {editContent}
     </div>
   )
 }
@@ -222,12 +212,22 @@ function TypingDots() {
   )
 }
 
-export default function MultiCityResults({ result, isLoading, error, onReSearch, onRetrySegment, retryingSegments, initialSelectedFlights, forcedSelections, mode, rawQuery, warningMessage, aiConsultMessage, onDismissWarning }: Props) {
+export default function MultiCityResults({ result, isLoading, error, onReSearch, onRetrySegment, retryingSegments, initialSelectedFlights, forcedSelections, mode, rawQuery, warningMessage, aiConsultMessage, onDismissWarning, onOpenFloatingChat }: Props) {
   // ── AI analysis state ────────────────────────────────────────────────────────
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<MultiCityAnalysis | null>(null)
   const [analysisError, setAnalysisError] = useState('')
-  const [pendingConsultMsg, setPendingConsultMsg] = useState<string | null>(null)
+
+  // ── Segment edit panel open/close state ──────────────────────────────────────
+  const [editOpenSegments, setEditOpenSegments] = useState<Set<number>>(new Set())
+  const toggleEditPanel = (idx: number) => {
+    setEditOpenSegments(prev => {
+      const next = new Set(prev)
+      if (next.has(idx)) next.delete(idx)
+      else next.add(idx)
+      return next
+    })
+  }
 
   // ── Segment expand / flight selection state ──────────────────────────────────
   const [expandedSegments, setExpandedSegments] = useState<Set<number>>(new Set())
@@ -253,15 +253,6 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
     }
   }, [forcedSelections])
 
-  // Auto-send consultation message once analysis finishes loading
-  useEffect(() => {
-    if (analysis && pendingConsultMsg) {
-      const msg = pendingConsultMsg
-      setPendingConsultMsg(null)
-      sendChat(msg)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [analysis])
 
   const handleSelectFlight = async (segIdx: number, newFlightIdx: number, oldFlightIdx: number) => {
     if (!result) return
@@ -574,14 +565,24 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                                       </p>
                                     )}
                                   </div>
-                                  <a
-                                    href={aviasalesLink(seg.origin, seg.destination, seg.date, 1)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="shrink-0 bg-green-600 hover:bg-green-700 text-white rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors whitespace-nowrap"
-                                  >
-                                    今すぐ予約→
-                                  </a>
+                                  <div className="flex flex-col items-stretch gap-1">
+                                    <a
+                                      href={aviasalesLink(seg.origin, seg.destination, seg.date, 1)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="shrink-0 bg-green-600 hover:bg-green-700 text-white rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors whitespace-nowrap text-center"
+                                    >
+                                      今すぐ予約→
+                                    </a>
+                                    {onRetrySegment && (
+                                      <button
+                                        onClick={() => toggleEditPanel(ci)}
+                                        className="text-xs text-gray-400 border border-gray-200 rounded px-2 py-0.5 hover:border-indigo-300 hover:text-indigo-500 transition-colors mt-1 w-full"
+                                      >
+                                        📅 日程・空港変更
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
 
@@ -594,8 +595,8 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                                   {isExpanded ? '▲ 閉じる' : `▼ 他の便を見る（${allFlights.length - 1}件）`}
                                 </button>
                               )}
-                              {/* Universal segment edit panel */}
-                              {onRetrySegment && (
+                              {/* Universal segment edit panel — shown when toggled */}
+                              {onRetrySegment && editOpenSegments.has(ci) && (
                                 <SegmentEditPanel segIdx={ci} seg={seg} hasFlight={true} onRetrySegment={onRetrySegment} />
                               )}
 
@@ -691,13 +692,8 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => {
-                  if (aiConsultMessage) {
-                    if (analysis) {
-                      sendChat(aiConsultMessage)
-                    } else {
-                      setPendingConsultMsg(aiConsultMessage)
-                      handleAnalyze()
-                    }
+                  if (aiConsultMessage && onOpenFloatingChat) {
+                    onOpenFloatingChat(aiConsultMessage)
                   }
                   onDismissWarning?.()
                 }}
