@@ -5,28 +5,22 @@ function buildSystemPrompt(): string {
   const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
   return `今日の日付は${today}です。
 
-あなたは航空券の価格分析の専門家です。提供された価格データを分析して、以下の形式で日本語で回答してください。
+あなたは航空券の価格分析の専門家です。提供された価格データを分析して、以下のJSON形式のみで回答してください。前置き・後書き・コードブロック記号は不要です。JSONだけを出力してください。
 
-まず分析結果をJSONで：
 {
   "verdict": "◎今すぐ",
   "reason": "判断理由を2〜3文で",
   "recommended": "最もおすすめの便の説明",
-  "caution": "注意点（ない場合はnull）"
+  "caution": "注意点（ない場合はnull）",
+  "suggestions": [
+    {"label": "ボタンラベル（12文字以内）", "airline": "航空会社名", "query": "チャットに送る質問文"}
+  ]
 }
 
-verdictは必ず「◎今すぐ」「△様子見」「✗待つべき」のいずれかにしてください。
-
-次に、必ず以下の<search_suggestions>タグを出力すること（提案がない場合も空配列で出力すること）：
-<search_suggestions>
-[
-  {"label": "ボタンに表示するラベル", "airline": "航空会社名", "query": "チャットに送る質問文"}
-]
-</search_suggestions>
-
-提案例：同じ区間で別の航空会社、前後1週間の価格帯、直行便のみの選択肢など。最大3件。
-
-東京→バンコクの平均価格帯（エコノミー往復6〜12万円、ビジネス20〜40万円）などの相場知識も活用して判断してください。`
+ルール：
+- verdictは必ず「◎今すぐ」「△様子見」「✗待つべき」のいずれか
+- suggestionsは必ず1〜3件含めること（同区間の別航空会社・直行便の有無・前後1週間の日程など）
+- 東京→バンコクの相場（エコノミー往復6〜12万円、ビジネス20〜40万円）などの知識を活用して判断`
 }
 
 interface RequestBody {
@@ -119,22 +113,27 @@ export async function POST(request: NextRequest) {
   const text: string = claudeData.content?.[0]?.text ?? ''
   console.log('[ai-analysis] raw response:', text)
 
-  // Extract suggestions from anywhere in the text (non-greedy, position-independent)
-  let suggestions: { label: string; airline: string; query: string }[] = []
-  const suggestionsMatch = text.match(/<search_suggestions>([\s\S]*?)<\/search_suggestions>/)
-  if (suggestionsMatch) {
-    try { suggestions = JSON.parse(suggestionsMatch[1].trim()) ?? [] } catch { /* fall through */ }
+  // Strip markdown code fences if Claude wraps the JSON
+  const cleaned = text.replace(/^```(?:json)?\s*/m, '').replace(/```\s*$/m, '').trim()
+
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(cleaned)
+  } catch {
+    // Fallback: extract first {...} block
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      return Response.json({ error: 'AI分析の解析に失敗しました' }, { status: 500 })
+    }
+    try {
+      parsed = JSON.parse(jsonMatch[0])
+    } catch {
+      return Response.json({ error: 'AI分析の解析に失敗しました' }, { status: 500 })
+    }
   }
+
+  const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : []
   console.log('[ai-analysis] suggestions parsed:', suggestions)
-
-  // Remove suggestions block before extracting JSON to avoid false matches
-  const textWithoutSuggestions = text.replace(/<search_suggestions>[\s\S]*?<\/search_suggestions>/g, '')
-  const jsonMatch = textWithoutSuggestions.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    return Response.json({ error: 'AI分析の解析に失敗しました' }, { status: 500 })
-  }
-
-  const parsed = JSON.parse(jsonMatch[0])
 
   return Response.json({ ...parsed, suggestions })
 }
