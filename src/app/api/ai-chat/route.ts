@@ -20,10 +20,15 @@ interface Context {
 interface RequestBody {
   messages: ChatMessage[]
   context?: Context
+  multiCityContext?: string
 }
 
-function buildSystemPrompt(context: Context | undefined): string {
-  if (!context?.query) return BASE_SYSTEM
+function buildSystemPrompt(context: Context | undefined, multiCityContext?: string): string {
+  const multiCityPrefix = multiCityContext
+    ? `以下は現在ユーザーが見ているマルチシティ旅程の情報です：\n${multiCityContext}\nこの情報を踏まえて回答してください。\n\n`
+    : ''
+
+  if (!context?.query) return multiCityPrefix + BASE_SYSTEM
 
   const { query, categorized } = context
   const lines: string[] = [
@@ -55,12 +60,12 @@ function buildSystemPrompt(context: Context | undefined): string {
     }
   }
 
-  return BASE_SYSTEM + '\n' + lines.join('\n')
+  return multiCityPrefix + BASE_SYSTEM + '\n' + lines.join('\n')
 }
 
 export async function POST(request: NextRequest) {
   const body: RequestBody = await request.json()
-  const { messages, context } = body
+  const { messages, context, multiCityContext } = body
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return Response.json({ error: 'messages are required' }, { status: 400 })
@@ -84,7 +89,7 @@ export async function POST(request: NextRequest) {
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
-      system: buildSystemPrompt(context),
+      system: buildSystemPrompt(context, multiCityContext),
       messages: trimmed,
     }),
   })

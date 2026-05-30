@@ -5,7 +5,7 @@ import { MessageCircle, X, Send, Plane } from 'lucide-react'
 import type { CategorizedFlights, SearchQuery } from '@/types'
 
 export interface AIChatHandle {
-  openWithMessage: (message: string) => void
+  openWithMessage: (message: string, context?: string) => void
 }
 
 interface ChatMessage {
@@ -69,6 +69,8 @@ const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categori
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  // Persists multi-city itinerary context across the chat session without causing re-renders
+  const multiCityContextRef = useRef<string | null>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -80,7 +82,7 @@ const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categori
     }
   }, [isOpen])
 
-  const send = async (text?: string) => {
+  const send = async (text?: string, contextOverride?: string) => {
     const content = (text ?? input).trim()
     if (!content || loading) return
 
@@ -94,7 +96,11 @@ const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categori
       const res = await fetch('/api/ai-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: next, context: { query, categorized } }),
+        body: JSON.stringify({
+          messages: next,
+          context: { query, categorized },
+          multiCityContext: contextOverride ?? multiCityContextRef.current ?? undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'エラーが発生しました')
@@ -110,9 +116,10 @@ const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categori
   }
 
   useImperativeHandle(ref, () => ({
-    openWithMessage: (message: string) => {
+    openWithMessage: (message: string, context?: string) => {
+      if (context) multiCityContextRef.current = context
       setIsOpen(true)
-      send(message)
+      send(message, context)
     },
   }))
 

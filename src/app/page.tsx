@@ -98,7 +98,7 @@ export default function HomePage() {
   const [multiCityError, setMultiCityError] = useState('')
   const [multiCityRawQuery, setMultiCityRawQuery] = useState<string | null>(null)
   const [retryingSegments, setRetryingSegments] = useState<Set<number>>(new Set())
-  const [multiCityWarning, setMultiCityWarning] = useState<{ message: string; consultMessage: string } | null>(null)
+  const [multiCityWarning, setMultiCityWarning] = useState<{ message: string; consultMessage: string; contextSummary: string } | null>(null)
 
   const [exploreParams, setExploreParams] = useState<ExploreParams | null>(null)
   const [pendingSelections, setPendingSelections] = useState<Record<number, number> | null>(null)
@@ -313,9 +313,27 @@ export default function HomePage() {
           if (diffDays < 2) {
             const segLabel = `区間${segmentIndex + 1}`
             const nextLabel = `区間${segmentIndex + 2}`
+            // Build itinerary summary for AI context
+            const summaryLines: string[] = ['旅程：']
+            multiCityResult.segments.forEach((seg, i) => {
+              const segDate = i === segmentIndex ? newDate : seg.date
+              const segResult = i === segmentIndex ? newSeg : seg
+              const airline = segResult.cheapestFlight?.segments[0]?.carrierName ?? '未定'
+              const price = segResult.cheapestPrice != null
+                ? `¥${Math.round(segResult.cheapestPrice).toLocaleString()}`
+                : '便なし'
+              summaryLines.push(`区間${i + 1}: ${seg.origin}→${seg.destination} ${segDate} ${airline} ${price}`)
+            })
+            const totalForSummary = multiCityResult.segments.reduce((sum, seg, i) => {
+              const p = i === segmentIndex ? (newSeg.cheapestPrice ?? 0) : (seg.cheapestPrice ?? 0)
+              return sum + p
+            }, 0)
+            summaryLines.push(`合計：¥${Math.round(totalForSummary).toLocaleString()}`)
+            summaryLines.push(`${segLabel}を${newDate}に変更したことで日程の競合が発生しました。`)
             setMultiCityWarning({
               message: `${segLabel}の日程変更により、${nextLabel}まで${diffDays}日しかありません。AIに旅程全体の最適化を相談しますか？`,
               consultMessage: `${segLabel}を${newDate}に変更しました。旅程全体の日程を最適化してください。`,
+              contextSummary: summaryLines.join('\n'),
             })
           }
         }
@@ -459,7 +477,7 @@ export default function HomePage() {
             warningMessage={multiCityWarning?.message}
             aiConsultMessage={multiCityWarning?.consultMessage}
             onDismissWarning={() => setMultiCityWarning(null)}
-            onOpenFloatingChat={(msg) => aiChatRef.current?.openWithMessage(msg)}
+            onOpenFloatingChat={(msg) => aiChatRef.current?.openWithMessage(msg, multiCityWarning?.contextSummary)}
             onReSearch={(q) => {
               const raw = `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`
               searchBarRef.current?.setQuery(raw)
