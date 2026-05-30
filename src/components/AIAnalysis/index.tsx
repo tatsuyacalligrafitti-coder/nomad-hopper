@@ -4,11 +4,18 @@ import { useState, useRef, useEffect } from 'react'
 import { Sparkles, Loader2, Send } from 'lucide-react'
 import type { CategorizedFlights, SearchQuery } from '@/types'
 
+interface AISuggestion {
+  label: string
+  airline: string
+  query: string
+}
+
 interface AnalysisResult {
   verdict: string
   reason: string
   recommended: string
   caution: string | null
+  suggestions?: AISuggestion[]
 }
 
 interface SearchSuggestion {
@@ -229,12 +236,30 @@ export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
             </div>
           )}
 
+          {result.suggestions && result.suggestions.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">💡 関連検索</p>
+              <div className="flex flex-wrap gap-2">
+                {result.suggestions.map((s) => (
+                  <button
+                    key={s.label}
+                    onClick={() => sendChat(s.query)}
+                    disabled={chatLoading}
+                    className="bg-blue-50 border border-blue-200 text-blue-700 rounded-lg px-4 py-2 text-sm hover:bg-blue-100 transition-colors disabled:opacity-50"
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <button
             onClick={analyze}
             disabled={loading}
-            className="flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors disabled:opacity-50"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg px-4 py-3 mt-4 flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
           >
-            {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+            {loading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
             再分析する
           </button>
 

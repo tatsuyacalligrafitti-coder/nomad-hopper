@@ -5,8 +5,9 @@ function buildSystemPrompt(): string {
   const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
   return `今日の日付は${today}です。
 
-あなたは航空券の価格分析の専門家です。提供された価格データを分析して以下を日本語で簡潔に答えてください。必ずJSON形式のみで回答してください：
+あなたは航空券の価格分析の専門家です。提供された価格データを分析して、以下の形式で日本語で回答してください。
 
+まず分析結果をJSONで：
 {
   "verdict": "◎今すぐ",
   "reason": "判断理由を2〜3文で",
@@ -15,6 +16,14 @@ function buildSystemPrompt(): string {
 }
 
 verdictは必ず「◎今すぐ」「△様子見」「✗待つべき」のいずれかにしてください。
+
+次に、関連する検索提案があれば最大3件（なければ空配列）：
+<search_suggestions>
+[
+  {"label": "ボタンに表示するラベル", "airline": "航空会社名", "query": "チャットに送る質問文"}
+]
+</search_suggestions>
+
 東京→バンコクの平均価格帯（エコノミー往復6〜12万円、ビジネス20〜40万円）などの相場知識も活用して判断してください。`
 }
 
@@ -107,11 +116,20 @@ export async function POST(request: NextRequest) {
   const claudeData = await claudeRes.json()
   const text: string = claudeData.content?.[0]?.text ?? ''
 
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
+  // Split before <search_suggestions> so greedy JSON match doesn't bleed into the tag
+  const [jsonPart, suggestionsRaw] = text.split('<search_suggestions>')
+  const jsonMatch = jsonPart.match(/\{[\s\S]*\}/)
   if (!jsonMatch) {
     return Response.json({ error: 'AI分析の解析に失敗しました' }, { status: 500 })
   }
 
   const parsed = JSON.parse(jsonMatch[0])
-  return Response.json(parsed)
+
+  let suggestions: { label: string; airline: string; query: string }[] = []
+  if (suggestionsRaw) {
+    const body = suggestionsRaw.replace(/<\/search_suggestions>[\s\S]*$/, '').trim()
+    try { suggestions = JSON.parse(body) ?? [] } catch { /* fall through */ }
+  }
+
+  return Response.json({ ...parsed, suggestions })
 }
