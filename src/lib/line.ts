@@ -1,4 +1,5 @@
 import { createHmac } from 'crypto'
+import type { AlertRequest } from '@/types'
 
 const PUSH_URL = 'https://api.line.me/v2/bot/message/push'
 
@@ -32,4 +33,23 @@ export async function pushLineMessage(userId: string, text: string): Promise<voi
     const detail = await res.text()
     throw new Error(`LINE push failed (${res.status}): ${detail}`)
   }
+}
+
+export function formatLineAlertMessage(alert: AlertRequest): string {
+  const discount = alert.currentPrice
+    ? Math.round((1 - alert.targetPrice / alert.currentPrice) * 100)
+    : null
+
+  return [
+    '✈️ 価格アラート設定完了',
+    '',
+    `区間　　: ${alert.origin} → ${alert.destination}`,
+    `出発日　: ${alert.departureDate}`,
+    alert.currentPrice ? `現在価格: ¥${alert.currentPrice.toLocaleString()}` : null,
+    `目標価格: ¥${alert.targetPrice.toLocaleString()}${discount ? `（${discount}% 引き）` : ''}`,
+    '',
+    '目標価格を下回ったらお知らせします。',
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n')
 }

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { Resend } from 'resend'
-import { pushLineMessage } from '@/lib/line'
+import { pushLineMessage, formatLineAlertMessage } from '@/lib/line'
 import type { AlertRequest } from '@/types'
 
 export async function POST(request: NextRequest) {
@@ -30,10 +30,7 @@ export async function POST(request: NextRequest) {
 
   if (body.lineUserId) {
     try {
-      await pushLineMessage(
-        body.lineUserId,
-        `✈️ 価格アラート設定完了\n${body.origin} → ${body.destination}\n出発: ${body.departureDate}\n目標価格: ¥${body.targetPrice.toLocaleString()} 以下になったら通知します`
-      )
+      await pushLineMessage(body.lineUserId, formatLineAlertMessage(body))
     } catch (e) {
       console.error('[alerts] LINE notification failed:', e)
     }

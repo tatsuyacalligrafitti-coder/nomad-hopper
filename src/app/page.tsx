@@ -9,6 +9,7 @@ import AIAnalysis from '@/components/AIAnalysis'
 import AIChat, { type AIChatHandle } from '@/components/AIChat'
 import AIExploreChat from '@/components/AIExploreChat'
 import MultiCityResults from '@/components/MultiCityResults'
+import AlertModal from '@/components/AlertModal'
 import type { CategorizedFlights, SearchMode, SearchQuery, MultiCityParsedQuery, MultiCitySearchResult, FlightResult } from '@/types'
 
 interface ExploreParams {
@@ -103,12 +104,34 @@ export default function HomePage() {
   const [exploreParams, setExploreParams] = useState<ExploreParams | null>(null)
   const [pendingSelections, setPendingSelections] = useState<Record<number, number> | null>(null)
 
+  const [lineCallbackFlight, setLineCallbackFlight] = useState<FlightResult | null>(null)
+  const [lineCallbackUserId, setLineCallbackUserId] = useState('')
+  const [lineCallbackDisplayName, setLineCallbackDisplayName] = useState('')
+
   const searchBarRef = useRef<SearchBarHandle>(null)
   const aiChatRef = useRef<AIChatHandle>(null)
 
-  // Auto-search from shared URL (?q=...&sel=...)
+  // Auto-search from shared URL (?q=...&sel=...) and LINE OAuth callback
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+
+    // LINE OAuth callback
+    const lineUserId = params.get('line_user_id')
+    if (lineUserId) {
+      const lineDisplayName = params.get('line_display_name') ?? ''
+      try {
+        const saved = sessionStorage.getItem('line_oauth_flight')
+        if (saved) {
+          setLineCallbackFlight(JSON.parse(saved))
+          setLineCallbackUserId(lineUserId)
+          setLineCallbackDisplayName(lineDisplayName)
+          sessionStorage.removeItem('line_oauth_flight')
+        }
+      } catch {}
+      window.history.replaceState({}, '', '/')
+      return
+    }
+
     const q = params.get('q')
     const sel = params.get('sel')
     if (!q) return
@@ -530,6 +553,16 @@ export default function HomePage() {
 
       {/* AI Chat — fixed position, always rendered */}
       <AIChat ref={aiChatRef} query={lastQuery} categorized={categorized} />
+
+      {/* LINE OAuth callback: auto-open alert modal with pre-filled userId */}
+      {lineCallbackFlight && lineCallbackUserId && (
+        <AlertModal
+          flight={lineCallbackFlight}
+          onClose={() => { setLineCallbackFlight(null); setLineCallbackUserId('') }}
+          prefilledLineUserId={lineCallbackUserId}
+          prefilledLineDisplayName={lineCallbackDisplayName}
+        />
+      )}
     </div>
   )
 }
