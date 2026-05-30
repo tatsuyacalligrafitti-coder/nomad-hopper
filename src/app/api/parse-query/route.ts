@@ -133,7 +133,8 @@ function tryParseMultiCity(query: string): MultiCityParsedQuery | null {
 
   // ── Pattern 2: 経由 (via) ────────────────────────────────────────────────
   // "東京からバンコク経由でナイロビへ"
-  const viaMatch = query.match(/(.+?)から(.+?)経由.{0,4}で(.+?)へ/)
+  // "12月15日に東京を出発してドバイ経由でロンドンへ"
+  const viaMatch = query.match(/(.+?)(?:から|を出発して)(.+?)経由.{0,4}で(.+?)へ/)
   if (viaMatch) {
     const origin = resolveCity(viaMatch[1])
     const via    = resolveCity(viaMatch[2])
@@ -142,13 +143,23 @@ function tryParseMultiCity(query: string): MultiCityParsedQuery | null {
       const baseDate  = extractBaseDate(query)
       const daysMatch = query.match(/(\d+)日間/)
       const totalDays = daysMatch ? parseInt(daysMatch[1]) : null
+
+      // Detect explicit return leg: "12月28日に東京へ戻る" / "12月28日 東京に戻る"
+      const returnLegM = query.match(
+        /[、，,].*?(\d{1,2}月\d{1,2}日|\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2}).*?(?:に)?(.{1,15}?)(?:へ|に)(?:戻る|もどる)/
+      )
+      const returnDate = returnLegM ? parseDate(returnLegM[1]) : null
+      const returnCity = (returnLegM ? resolveCity(returnLegM[2]) : null) ?? origin
+
       const segments: MultiCitySegmentQuery[] = [
         { origin, destination: via, date: baseDate },
         { origin: via, destination: dest, date: addDays(baseDate, 3) },
-        ...(totalDays
-          ? [{ origin: dest, destination: origin, date: addDays(baseDate, totalDays) }]
-          : []),
       ]
+      if (returnDate) {
+        segments.push({ origin: dest, destination: returnCity, date: returnDate })
+      } else if (totalDays) {
+        segments.push({ origin: dest, destination: origin, date: addDays(baseDate, totalDays) })
+      }
       return { type: 'multi-city', segments, passengers, cabinClass }
     }
   }
@@ -258,13 +269,17 @@ function tryParseMultiCity(query: string): MultiCityParsedQuery | null {
   {
     const DATE_RX = /\d{1,2}月\d{1,2}日|\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2}/
 
-    // Identify departure origin: from "Xから" or "[date]X発"
+    // Identify departure origin: from "Xから", "[date]X発", or "Xを出発して"
     let dcOrigin: string | null = null
     const fromM = query.match(/^(.{1,15}?)から/)
     if (fromM) dcOrigin = resolveCity(fromM[1].trim())
     if (!dcOrigin) {
       const hatsuM = query.match(/(?:\d{1,2}月\d{1,2}日|\d{1,2}\/\d{1,2})?(.{1,10}?)発/)
       if (hatsuM?.[1]) dcOrigin = resolveCity(hatsuM[1].trim())
+    }
+    if (!dcOrigin) {
+      const shutsupatsuM = query.match(/([^\d、，,。\s]{1,15}?)を出発して/)
+      if (shutsupatsuM?.[1]) dcOrigin = resolveCity(shutsupatsuM[1].trim())
     }
 
     if (dcOrigin) {
@@ -306,6 +321,33 @@ function tryParseMultiCity(query: string): MultiCityParsedQuery | null {
         if (segments.length >= 2) {
           return { type: 'multi-city', segments, passengers, cabinClass }
         }
+      }
+    }
+  }
+
+  // ── Pattern 6: "AからB、CからD" (複数の独立ルート) ───────────────────────
+  // "東京からロンドン、パリからニューヨーク"
+  {
+    const parts = query.split(/[、，,]/)
+    if (parts.length >= 2) {
+      const baseDate = extractBaseDate(query)
+      const segs: MultiCitySegmentQuery[] = []
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i].trim()
+        const fromM = part.match(/(.+?)から(.+)/)
+        if (!fromM) continue
+        const o = resolveCity(fromM[1].trim())
+        // strip trailing particles/verbs before resolving destination
+        const destFrag = fromM[2]
+          .replace(/[へにでは]\s*(?:行く|向かう|出発)?.*$/, '')
+          .trim()
+        const d = destFrag ? resolveCity(destFrag) : null
+        if (o && d && o !== d) {
+          segs.push({ origin: o, destination: d, date: parseDate(part) ?? addDays(baseDate, i * 3) })
+        }
+      }
+      if (segs.length >= 2) {
+        return { type: 'multi-city', segments: segs, passengers, cabinClass }
       }
     }
   }
