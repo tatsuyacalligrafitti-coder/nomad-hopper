@@ -119,20 +119,22 @@ export async function POST(request: NextRequest) {
   const text: string = claudeData.content?.[0]?.text ?? ''
   console.log('[ai-analysis] raw response:', text)
 
-  // Split before <search_suggestions> so greedy JSON match doesn't bleed into the tag
-  const [jsonPart, suggestionsRaw] = text.split('<search_suggestions>')
-  const jsonMatch = jsonPart.match(/\{[\s\S]*\}/)
+  // Extract suggestions from anywhere in the text (non-greedy, position-independent)
+  let suggestions: { label: string; airline: string; query: string }[] = []
+  const suggestionsMatch = text.match(/<search_suggestions>([\s\S]*?)<\/search_suggestions>/)
+  if (suggestionsMatch) {
+    try { suggestions = JSON.parse(suggestionsMatch[1].trim()) ?? [] } catch { /* fall through */ }
+  }
+  console.log('[ai-analysis] suggestions parsed:', suggestions)
+
+  // Remove suggestions block before extracting JSON to avoid false matches
+  const textWithoutSuggestions = text.replace(/<search_suggestions>[\s\S]*?<\/search_suggestions>/g, '')
+  const jsonMatch = textWithoutSuggestions.match(/\{[\s\S]*\}/)
   if (!jsonMatch) {
     return Response.json({ error: 'AI分析の解析に失敗しました' }, { status: 500 })
   }
 
   const parsed = JSON.parse(jsonMatch[0])
-
-  let suggestions: { label: string; airline: string; query: string }[] = []
-  if (suggestionsRaw) {
-    const body = suggestionsRaw.replace(/<\/search_suggestions>[\s\S]*$/, '').trim()
-    try { suggestions = JSON.parse(body) ?? [] } catch { /* fall through */ }
-  }
 
   return Response.json({ ...parsed, suggestions })
 }

@@ -111,6 +111,7 @@ export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'AI分析に失敗しました')
+      console.log('[ui] suggestions:', (data as AnalysisResult).suggestions)
       setResult(data as AnalysisResult)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'AI分析に失敗しました')
