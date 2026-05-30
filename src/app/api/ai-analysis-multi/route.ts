@@ -80,16 +80,21 @@ function buildSystemPrompt(mode: SearchMode): string {
   const marketRates = mode === 'elegant' ? MARKET_RATES_BUSINESS : MARKET_RATES_ECONOMY
   return `今日の日付は${today}です。
 
-以下のマルチシティ旅程データを分析して日本語で答えてください。必ずJSON形式のみで回答してください：
+以下のマルチシティ旅程データを分析して日本語で答えてください。前置き・後書き・コードブロック記号は不要です。JSONだけを出力してください：
 
 {
   "verdict": "◎今すぐ",
   "reason": "選定理由・評価を2〜4文で（モードの評価軸に沿って解説）",
   "recommended": "各区間の選定理由または注目ポイントを具体的に説明",
-  "tip": "改善提案や追加アドバイス（代替航空会社・逆ルート・滞在調整など。不要ならnull）"
+  "tip": "改善提案や追加アドバイス（代替航空会社・逆ルート・滞在調整など。不要ならnull）",
+  "suggestions": [
+    {"label": "ボタンラベル（12文字以内）", "airline": "航空会社名", "query": "チャットに送る質問文"}
+  ]
 }
 
-verdictは必ず「◎今すぐ」「△様子見」「✗待つべき」のいずれかにしてください。
+ルール：
+- verdictは必ず「◎今すぐ」「△様子見」「✗待つべき」のいずれか
+- suggestionsは必ず1〜3件含めること（代替航空会社・直行便の有無・別ルート・日程変更など）
 
 ${MODE_INSTRUCTIONS[mode]}
 
@@ -158,7 +163,7 @@ export async function POST(request: NextRequest) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1000,
+      max_tokens: 1500,
       system: buildSystemPrompt(mode),
       messages: [{ role: 'user', content: userMessage }],
     }),
@@ -174,11 +179,28 @@ export async function POST(request: NextRequest) {
 
   const claudeData = await claudeRes.json()
   const text: string = claudeData.content?.[0]?.text ?? ''
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    return Response.json({ error: 'AI分析の解析に失敗しました' }, { status: 500 })
+  console.log('[ai-analysis-multi] raw response:', text)
+
+  // Strip markdown code fences if Claude wraps the JSON
+  const cleaned = text.replace(/^```(?:json)?\s*/m, '').replace(/```\s*$/m, '').trim()
+
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(cleaned)
+  } catch {
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      return Response.json({ error: 'AI分析の解析に失敗しました' }, { status: 500 })
+    }
+    try {
+      parsed = JSON.parse(jsonMatch[0])
+    } catch {
+      return Response.json({ error: 'AI分析の解析に失敗しました' }, { status: 500 })
+    }
   }
 
-  const parsed = JSON.parse(jsonMatch[0])
-  return Response.json(parsed)
+  const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : []
+  console.log('[ai-analysis-multi] suggestions parsed:', suggestions)
+
+  return Response.json({ ...parsed, suggestions })
 }

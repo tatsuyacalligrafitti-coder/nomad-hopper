@@ -8,11 +8,18 @@ import { getRouteEstimate, getPriceBadge, getPriceBadgeLabel, getPriceBadgeColor
 import type { MultiCitySearchResult, MultiCitySegmentResult, SearchMode } from '@/types'
 import AlertModal from '@/components/AlertModal'
 
+interface AISuggestion {
+  label: string
+  airline: string
+  query: string
+}
+
 interface MultiCityAnalysis {
   verdict: string
   reason: string
   recommended?: string
   tip: string | null
+  suggestions?: AISuggestion[]
 }
 
 interface SearchSuggestion {
@@ -839,14 +846,24 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                 </div>
               )}
 
-              <button
-                onClick={handleAnalyze}
-                disabled={isAnalyzing}
-                className="flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors disabled:opacity-50"
-              >
-                {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                再分析する
-              </button>
+              {/* Search suggestion buttons */}
+              {analysis.suggestions && analysis.suggestions.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">💡 関連検索</p>
+                  <div className="flex flex-wrap gap-2">
+                    {analysis.suggestions.map((s) => (
+                      <button
+                        key={s.label}
+                        onClick={() => sendChat(s.query)}
+                        disabled={chatLoading}
+                        className="bg-blue-50 border border-blue-200 text-blue-700 rounded-lg px-4 py-2 text-sm hover:bg-blue-100 transition-colors disabled:opacity-50"
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Inline chat */}
