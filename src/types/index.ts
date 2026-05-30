@@ -49,7 +49,7 @@ export interface ParsedQuery {
 
 export interface AlertRequest {
   email?: string
-  lineToken?: string
+  lineUserId?: string
   flightId: string
   targetPrice: number
   currentPrice?: number

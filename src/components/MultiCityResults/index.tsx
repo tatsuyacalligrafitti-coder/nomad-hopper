@@ -474,6 +474,7 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
   ]
 
   return (
+    <>
     <div className="rounded-2xl border border-purple-200 bg-white overflow-hidden">
       {/* Header */}
       <div className="bg-purple-600 px-5 py-3 flex items-center gap-2">
@@ -978,5 +979,6 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
         ? <AlertModal flight={alertFlight} onClose={() => setAlertSegmentIdx(null)} />
         : null
     })()}
+    </>
   )
 }

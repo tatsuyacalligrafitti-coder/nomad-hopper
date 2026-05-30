@@ -1,13 +1,14 @@
 import { NextRequest } from 'next/server'
 import { Resend } from 'resend'
+import { pushLineMessage } from '@/lib/line'
 import type { AlertRequest } from '@/types'
 
 export async function POST(request: NextRequest) {
   const body: AlertRequest = await request.json()
 
-  if (!body.email && !body.lineToken) {
+  if (!body.email && !body.lineUserId) {
     return Response.json(
-      { error: 'メールアドレスまたはLINEトークンが必要です' },
+      { error: 'メールアドレスまたはLINEユーザーIDが必要です' },
       { status: 400 }
     )
   }
@@ -27,9 +28,12 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (body.lineToken) {
+  if (body.lineUserId) {
     try {
-      await sendLineNotification(body.lineToken, body)
+      await pushLineMessage(
+        body.lineUserId,
+        `✈️ 価格アラート設定完了\n${body.origin} → ${body.destination}\n出発: ${body.departureDate}\n目標価格: ¥${body.targetPrice.toLocaleString()} 以下になったら通知します`
+      )
     } catch (e) {
       console.error('[alerts] LINE notification failed:', e)
     }
@@ -90,22 +94,5 @@ async function sendConfirmationEmail(alert: AlertRequest) {
   </div>
 </body>
 </html>`,
-  })
-}
-
-async function sendLineNotification(token: string, alert: AlertRequest) {
-  const message =
-    `✈️ Nomad Hopper 価格アラート登録完了\n` +
-    `${alert.origin} → ${alert.destination}\n` +
-    `出発: ${alert.departureDate}\n` +
-    `目標価格: ¥${alert.targetPrice.toLocaleString()} 以下になったら通知します`
-
-  await fetch('https://notify-api.line.me/api/notify', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({ message }),
   })
 }

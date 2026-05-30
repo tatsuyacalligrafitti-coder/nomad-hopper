@@ -14,7 +14,7 @@ type NotifyMethod = 'email' | 'line'
 export default function AlertModal({ flight, onClose }: Props) {
   const [method, setMethod] = useState<NotifyMethod>('email')
   const [email, setEmail] = useState('')
-  const [lineToken, setLineToken] = useState('')
+  const [lineUserId, setLineUserId] = useState('')
   const [targetPrice, setTargetPrice] = useState(
     Math.floor(flight.totalPrice * 0.9)
   )
@@ -33,8 +33,8 @@ export default function AlertModal({ flight, onClose }: Props) {
       setError('メールアドレスを入力してください')
       return
     }
-    if (method === 'line' && !lineToken) {
-      setError('LINEトークンを入力してください')
+    if (method === 'line' && !lineUserId) {
+      setError('LINE ユーザーIDを入力してください')
       return
     }
 
@@ -45,7 +45,7 @@ export default function AlertModal({ flight, onClose }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: method === 'email' ? email : undefined,
-          lineToken: method === 'line' ? lineToken : undefined,
+          lineUserId: method === 'line' ? lineUserId : undefined,
           flightId: flight.id,
           targetPrice,
           currentPrice: Math.round(flight.totalPrice),
@@ -167,17 +167,17 @@ export default function AlertModal({ flight, onClose }: Props) {
             ) : (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  LINE Notify トークン
+                  LINE ユーザーID
                 </label>
                 <input
                   type="text"
-                  value={lineToken}
-                  onChange={(e) => setLineToken(e.target.value)}
-                  placeholder="LINE Notifyで発行したトークン"
+                  value={lineUserId}
+                  onChange={(e) => setLineUserId(e.target.value)}
+                  placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 />
                 <p className="text-xs text-gray-400 mt-1">
-                  notify-bot.line.me でトークンを取得できます
+                  Tobira の LINE 公式アカウントを友だち追加すると、ユーザーIDが届きます
                 </p>
               </div>
             )}
