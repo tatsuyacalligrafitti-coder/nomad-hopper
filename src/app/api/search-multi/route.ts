@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { searchSkyscanner } from '@/lib/skyscanner'
+import { searchAllProviders } from '@/lib/flight-search-orchestrator'
 import { getAirportByIata } from '@/lib/airport-db'
 import type { MultiCitySegmentQuery, MultiCitySearchResult, SearchQuery } from '@/types'
 
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const flights = await searchSkyscanner(query)
+      const flights = await searchAllProviders(query)
       const sorted = [...flights].sort((a, b) => a.totalPrice - b.totalPrice)
       results.push({
         origin: seg.origin,
