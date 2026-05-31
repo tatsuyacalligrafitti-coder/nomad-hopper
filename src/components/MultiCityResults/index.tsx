@@ -317,6 +317,14 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
     () => [(result?.segments ?? []).map((_, i) => `seg-${i}`)]
   )
   const [historyIndex, setHistoryIndex] = useState(0)
+  const [showAIPulse, setShowAIPulse] = useState(false)
+
+  useEffect(() => {
+    if (!result) return
+    const t1 = setTimeout(() => setShowAIPulse(true), 3000)
+    const t2 = setTimeout(() => setShowAIPulse(false), 4000)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [result])
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
@@ -962,41 +970,48 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
           </div>
         )}
 
-        {/* Reorder re-calculate button */}
-        <button
-          onClick={handleReorderSearch}
-          disabled={!isReordered}
-          className={[
-            'w-full rounded-lg py-2.5 text-sm font-medium transition-colors',
-            segmentHistory.length <= 1 ? 'mt-4' : '',
-            isReordered
-              ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-              : 'text-gray-400 border border-gray-200 cursor-default',
-          ].join(' ')}
-        >
-          {isReordered ? '🔄 この旅程で再計算する' : '✓ 最新の金額です'}
-        </button>
-
-        {/* AI analysis trigger */}
+        {/* AI analysis trigger — primary action, shown above reorder button */}
         {!analysis && (
           <>
             <button
               onClick={handleAnalyze}
               disabled={isAnalyzing}
-              className="mt-4 w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
+              className={[
+                'mt-4 w-full flex items-center justify-center gap-2',
+                'bg-gradient-to-r from-indigo-600 to-purple-600',
+                'hover:from-indigo-700 hover:to-purple-700',
+                'disabled:from-indigo-300 disabled:to-purple-300',
+                'text-white font-semibold rounded-xl py-4',
+                'shadow-lg shadow-indigo-200 transition-all',
+                showAIPulse ? 'animate-pulse' : '',
+              ].join(' ')}
             >
               {isAnalyzing ? (
-                <Loader2 size={15} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
               ) : (
-                <Sparkles size={15} />
+                <Sparkles size={16} />
               )}
-              {isAnalyzing ? 'AI分析中...' : 'この旅程をAIが分析する'}
+              {isAnalyzing ? 'AI分析中...' : '✨ この旅程をAIが分析する'}
             </button>
             {analysisError && (
               <p className="mt-2 text-xs text-red-500">{analysisError}</p>
             )}
           </>
         )}
+
+        {/* Reorder re-calculate button — secondary action */}
+        <button
+          onClick={handleReorderSearch}
+          disabled={!isReordered}
+          className={[
+            'mt-3 w-full rounded-lg py-3 flex items-center justify-center gap-2 text-sm font-medium transition-colors',
+            isReordered
+              ? 'border-2 border-indigo-500 text-indigo-600 bg-white hover:bg-indigo-50'
+              : 'border border-gray-200 text-gray-400 bg-white cursor-default',
+          ].join(' ')}
+        >
+          {isReordered ? '🔄 この旅程で再計算する' : '✓ 最新の金額です'}
+        </button>
 
         {/* AI analysis result + inline chat */}
         {analysis && vs && (
