@@ -12,6 +12,15 @@ const EXAMPLES = [
   '🇵🇭 大阪からマニラへ 3泊',
 ]
 
+const PLACEHOLDER_EXAMPLES = [
+  '東京からバンコクへ 12月25日 1名',
+  '予算10万円でGWに南の島へのんびり行きたい',
+  '大阪発 ビジネスクラス ロンドン 最速で',
+  '9月に涼しくて物価が安い国へ行きたい、3泊くらい',
+  '福岡→ソウル→台北→東京 来月 一人旅',
+  '子連れで安心して行けるアジアのリゾートは？',
+]
+
 interface ExploreParams {
   origin?: string
   destination?: string
@@ -42,8 +51,48 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
   const [parsed, setParsed] = useState<ParsedQuery | MultiCityParsedQuery | null>(null)
   const [isParsing, setIsParsing] = useState(false)
   const [error, setError] = useState('')
+  const [placeholder, setPlaceholder] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Typewriter placeholder animation — stops while user is typing
+  useEffect(() => {
+    if (rawQuery) {
+      setPlaceholder('')
+      return
+    }
+    let exIdx = 0
+    let charIdx = 0
+    let deleting = false
+    let tid: ReturnType<typeof setTimeout> | null = null
+
+    function tick() {
+      const text = PLACEHOLDER_EXAMPLES[exIdx]
+      if (!deleting) {
+        charIdx++
+        setPlaceholder(text.slice(0, charIdx))
+        if (charIdx === text.length) {
+          deleting = true
+          tid = setTimeout(tick, 2400)
+        } else {
+          tid = setTimeout(tick, 60)
+        }
+      } else {
+        charIdx--
+        setPlaceholder(text.slice(0, charIdx))
+        if (charIdx === 0) {
+          deleting = false
+          exIdx = (exIdx + 1) % PLACEHOLDER_EXAMPLES.length
+          tid = setTimeout(tick, 400)
+        } else {
+          tid = setTimeout(tick, 28)
+        }
+      }
+    }
+
+    tid = setTimeout(tick, 60)
+    return () => { if (tid !== null) clearTimeout(tid) }
+  }, [rawQuery])
 
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
@@ -154,7 +203,7 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
             type="text"
             value={rawQuery}
             onChange={(e) => setRawQuery(e.target.value)}
-            placeholder="例: 東京からバンコクへ 12月25日 1名"
+            placeholder={placeholder}
             className="flex-1 outline-none text-gray-800 text-base placeholder-gray-400 bg-transparent"
           />
           {isParsing && <Loader2 className="text-indigo-400 animate-spin shrink-0" size={16} />}
