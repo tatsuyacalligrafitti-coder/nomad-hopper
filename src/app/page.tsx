@@ -628,7 +628,16 @@ export default function HomePage() {
       </footer>
 
       {/* AI Chat — fixed position, always rendered */}
-      <AIChat ref={aiChatRef} query={lastQuery} categorized={categorized} onSearchQuery={handleChatSearch} />
+      <AIChat
+        ref={aiChatRef}
+        query={lastQuery}
+        categorized={categorized}
+        onSearchQuery={handleChatSearch}
+        onExploreMode={(rawQuery) => {
+          searchBarRef.current?.setQuery(rawQuery)
+          handleExplore({ rawQuery })
+        }}
+      />
 
       {/* LINE OAuth callback: auto-open alert modal with pre-filled userId */}
       {lineCallbackFlight && lineCallbackUserId && (

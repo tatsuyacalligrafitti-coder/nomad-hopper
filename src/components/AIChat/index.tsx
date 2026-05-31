@@ -13,16 +13,23 @@ interface FlightSearch {
   label: string
 }
 
+interface ExploreMode {
+  query: string
+  label: string
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   flightSearches?: FlightSearch[]
+  exploreMode?: ExploreMode | null
 }
 
 interface Props {
   query: SearchQuery | null
   categorized: CategorizedFlights | null
   onSearchQuery?: (rawQuery: string) => void
+  onExploreMode?: (rawQuery: string) => void
 }
 
 const DEFAULT_SUGGESTIONS = [
@@ -69,7 +76,7 @@ function TypingDots() {
   )
 }
 
-const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categorized, onSearchQuery }, ref) {
+const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categorized, onSearchQuery, onExploreMode }, ref) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -115,6 +122,7 @@ const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categori
         role: 'assistant',
         content: data.content,
         flightSearches: data.flightSearches ?? [],
+        exploreMode: data.exploreMode ?? null,
       }])
     } catch (err) {
       setMessages([...next, {
@@ -210,20 +218,25 @@ const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categori
                     {msg.content}
                   </div>
                 </div>
-                {msg.role === 'assistant' && msg.flightSearches && msg.flightSearches.length > 0 && (
+                {msg.role === 'assistant' && (msg.flightSearches?.length || msg.exploreMode) && (
                   <div className="space-y-1.5 pl-1">
-                    {msg.flightSearches.map((fs) => (
+                    {msg.flightSearches?.map((fs) => (
                       <button
                         key={fs.query}
-                        onClick={() => {
-                          setIsOpen(false)
-                          onSearchQuery?.(fs.query)
-                        }}
+                        onClick={() => { setIsOpen(false); onSearchQuery?.(fs.query) }}
                         className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg px-4 py-2 flex items-center justify-center gap-2 transition-colors"
                       >
                         {fs.label}
                       </button>
                     ))}
+                    {msg.exploreMode && (
+                      <button
+                        onClick={() => { setIsOpen(false); onExploreMode?.(msg.exploreMode!.query) }}
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg px-4 py-2 flex items-center justify-center gap-2 transition-colors"
+                      >
+                        {msg.exploreMode.label}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

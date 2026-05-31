@@ -17,16 +17,18 @@ const BASE_SYSTEM = `あなたはNomad Hopperの旅行AIアシスタントです
 その代わり、会話の中で不明な情報（日程・出発地など）をユーザーに確認し、
 返答の末尾に「出発日と出発地が決まったら、すぐに検索できます！」を添える。
 
-条件が揃っている場合のフォーマット（最大2件）：
+【ケース1】出発地・目的地・具体的日付が全て揃っている場合（最大2件）：
 <flight_search>
 {"query": "YYYY年MM月DD日にXXからYYへ", "label": "✈️ XX→YY MM月DD日を検索する"}
 </flight_search>
+queryは必ず「YYYY年MM月DD日にXXからYYへ」形式の自然な日本語。機械的文字列（例：「東京 バリ島 2025-04-29」）は絶対禁止。
 
-queryのルール：
-- 必ず「YYYY年MM月DD日にXXからYYへ」形式の自然な日本語にする
-- 「東京 バリ島 2025-04-29」のような機械的な文字列は絶対禁止
-- 例：query: "2027年4月29日に東京からデンパサールへ"
-- 例：label: "✈️ 東京→バリ島 4月29日を検索する"`
+【ケース2】日程・出発地・目的地のいずれかが不明な抽象的な相談の場合：
+<flight_search>タグは出力しない。代わりに以下を出力：
+<explore_mode>
+{"query": "ユーザーの相談内容をそのまま自然な日本語で", "label": "🗺️ 旅の相談モードで詳しく計画する"}
+</explore_mode>
+また返答の末尾に「出発日と出発地が決まったら、すぐに検索できます！」を添える。`
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -126,7 +128,7 @@ export async function POST(request: NextRequest) {
   const data = await claudeRes.json()
   const raw: string = data.content?.[0]?.text ?? ''
 
-  // Extract <flight_search> tags before stripping them from the display content
+  // Extract <flight_search> tags
   const flightSearches: Array<{ query: string; label: string }> = []
   for (const m of raw.matchAll(/<flight_search>\s*([\s\S]*?)\s*<\/flight_search>/g)) {
     try {
@@ -134,7 +136,21 @@ export async function POST(request: NextRequest) {
       if (parsed.query && parsed.label) flightSearches.push(parsed)
     } catch {}
   }
-  const content = raw.replace(/<flight_search>[\s\S]*?<\/flight_search>/g, '').trim()
 
-  return Response.json({ content, flightSearches })
+  // Extract <explore_mode> tag (at most one)
+  let exploreMode: { query: string; label: string } | null = null
+  const exploreMatch = raw.match(/<explore_mode>\s*([\s\S]*?)\s*<\/explore_mode>/)
+  if (exploreMatch) {
+    try {
+      const parsed = JSON.parse(exploreMatch[1].trim())
+      if (parsed.query && parsed.label) exploreMode = parsed
+    } catch {}
+  }
+
+  const content = raw
+    .replace(/<flight_search>[\s\S]*?<\/flight_search>/g, '')
+    .replace(/<explore_mode>[\s\S]*?<\/explore_mode>/g, '')
+    .trim()
+
+  return Response.json({ content, flightSearches, exploreMode })
 }
