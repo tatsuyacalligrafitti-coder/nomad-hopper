@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const STORAGE_KEY = 'tobira_onboarding_shown'
-const TOTAL_PAGES = 5
+const TOTAL_PAGES = 6
 
 function Page1() {
   return (
@@ -96,9 +96,9 @@ function Page3() {
   ]
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <h2 className="text-xl font-bold text-gray-900">🔍 こんな風に使えます</h2>
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {examples.map((ex) => (
           <div
             key={ex}
@@ -122,6 +122,47 @@ function Page3() {
 }
 
 function Page4() {
+  return (
+    <div className="space-y-3">
+      <h2 className="text-xl font-bold text-gray-900">🧩 旅程をパズルのように組み替えられる</h2>
+      <p className="text-sm text-gray-600 leading-relaxed">
+        複数の都市を旅するとき、<br />
+        訪問順を変えるだけで料金が大きく変わることがあります。<br />
+        Tobiraなら区間カードをドラッグして<br />
+        順番を自由に入れ替えられます。
+      </p>
+
+      <div className="my-4 flex flex-col gap-2">
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2 flex items-center gap-3 text-sm">
+          <span className="text-gray-400">⠿</span>
+          <span>🛫 東京 → バンコク</span>
+          <span className="ml-auto text-indigo-600 font-medium">¥41,000</span>
+        </div>
+        <div
+          className="bg-purple-50 border-2 border-purple-300 rounded-lg px-4 py-2 flex items-center gap-3 text-sm animate-bounce"
+          style={{ animationDuration: '2s' }}
+        >
+          <span className="text-gray-400">⠿</span>
+          <span>🛫 バンコク → ドバイ</span>
+          <span className="ml-auto text-purple-600 font-medium">¥38,000</span>
+        </div>
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2 flex items-center gap-3 text-sm">
+          <span className="text-gray-400">⠿</span>
+          <span>🛫 ドバイ → 東京</span>
+          <span className="ml-auto text-indigo-600 font-medium">¥111,000</span>
+        </div>
+      </div>
+
+      <ul className="text-xs text-gray-500 space-y-1 mt-2">
+        <li>👆 スマホは長押し→ドラッグで操作</li>
+        <li>↩️ 戻す・進む・リセットボタンあり</li>
+        <li>🔄 並び替え後に「再計算」で最新金額を取得</li>
+      </ul>
+    </div>
+  )
+}
+
+function Page5() {
   const items = [
     '国内線の検索が苦手',
     'JAL・ANAなど一部FSCのデータが薄い',
@@ -151,7 +192,7 @@ function Page4() {
   )
 }
 
-function Page5({ onClose }: { onClose: () => void }) {
+function Page6({ onClose }: { onClose: () => void }) {
   const roadmap = [
     { icon: '✈️', text: '陸マイラーサポート機能' },
     { icon: '🗺️', text: '地図で旅程を視覚化' },
@@ -239,13 +280,14 @@ export default function OnboardingModal() {
               </button>
             </div>
 
-            {/* Page content */}
-            <div className="flex-1 overflow-y-auto px-6 py-3 min-h-0">
+            {/* Page content — fixed min-height so modal size stays stable */}
+            <div className="flex-1 overflow-y-auto px-6 py-3 min-h-0 min-h-[420px]">
               {page === 0 && <Page1 />}
               {page === 1 && <Page2 />}
               {page === 2 && <Page3 />}
               {page === 3 && <Page4 />}
-              {page === 4 && <Page5 onClose={close} />}
+              {page === 4 && <Page5 />}
+              {page === 5 && <Page6 onClose={close} />}
             </div>
 
             {/* Navigation footer */}
@@ -291,7 +333,7 @@ export default function OnboardingModal() {
               </div>
             )}
 
-            {/* Dots on last page (no nav buttons — Page5 has its own CTA) */}
+            {/* Dots on last page (no nav buttons — Page6 has its own CTA) */}
             {page === TOTAL_PAGES - 1 && (
               <div className="flex justify-center gap-1.5 pb-5 pt-2 shrink-0">
                 {Array.from({ length: TOTAL_PAGES }).map((_, i) => (
