@@ -10,6 +10,7 @@ import AIChat, { type AIChatHandle } from '@/components/AIChat'
 import AIExploreChat from '@/components/AIExploreChat'
 import MultiCityResults from '@/components/MultiCityResults'
 import AlertModal from '@/components/AlertModal'
+import OnboardingModal from '@/components/OnboardingModal'
 import type { CategorizedFlights, SearchMode, SearchQuery, MultiCityParsedQuery, MultiCitySearchResult, FlightResult } from '@/types'
 
 interface ExploreParams {
@@ -638,6 +639,9 @@ export default function HomePage() {
           handleExplore({ rawQuery })
         }}
       />
+
+      {/* Onboarding modal + help button */}
+      <OnboardingModal />
 
       {/* LINE OAuth callback: auto-open alert modal with pre-filled userId */}
       {lineCallbackFlight && lineCallbackUserId && (
