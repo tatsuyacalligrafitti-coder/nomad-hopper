@@ -168,7 +168,7 @@ const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categori
         <div className="bg-indigo-600 px-4 py-3 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <Plane size={16} className="text-white" style={{ transform: 'rotate(-45deg)' }} />
-            <span className="text-white font-bold text-sm">Nomad AI</span>
+            <span className="text-white font-bold text-sm">Tobira AI</span>
             <span className="text-indigo-300 text-xs hidden sm:inline">旅行アシスタント</span>
           </div>
           <button
