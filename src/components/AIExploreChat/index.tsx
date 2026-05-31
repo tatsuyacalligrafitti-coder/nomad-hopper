@@ -191,7 +191,8 @@ export default function AIExploreChat({ origin, destination, rawQuery, onSearch,
       </div>
 
       {/* Input */}
-      <div className="border-t border-purple-100 bg-gray-50 px-3 py-2.5">
+      <div className="border-t border-purple-100 bg-gray-50 p-3">
+        <p className="text-xs text-purple-500 font-medium mb-1 px-1">💬 続けて質問できます</p>
         <div className="flex items-end gap-2">
           <textarea
             ref={textareaRef}
@@ -203,9 +204,9 @@ export default function AIExploreChat({ origin, destination, rawQuery, onSearch,
                 handleSend()
               }
             }}
-            placeholder="続けて質問できます（Shift+Enterで改行）"
+            placeholder="例：もっと安い時期は？　直行便はある？"
             rows={1}
-            className="flex-1 resize-none outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent max-h-32 overflow-y-auto"
+            className="flex-1 resize-none text-sm text-gray-700 placeholder-gray-400 bg-white border-2 border-purple-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 rounded-xl px-4 py-3 outline-none max-h-32 overflow-y-auto transition-all"
           />
           <button
             onClick={() => handleSend()}
