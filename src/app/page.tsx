@@ -442,6 +442,23 @@ export default function HomePage() {
     }
   }
 
+  const handleChatSearch = async (rawQuery: string) => {
+    searchBarRef.current?.setQuery(rawQuery)
+    try {
+      const res = await fetch('/api/parse-query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: rawQuery }),
+      })
+      const parsed = await res.json()
+      if (parsed?.type === 'multi-city') {
+        handleMultiCitySearch(parsed, rawQuery)
+      } else if (parsed?.origin && parsed?.destination) {
+        handleSearch(parsed)
+      }
+    } catch {}
+  }
+
   const handleSearch = async (query: SearchQuery) => {
     setIsLoading(true)
     setError('')
@@ -607,7 +624,7 @@ export default function HomePage() {
       </footer>
 
       {/* AI Chat — fixed position, always rendered */}
-      <AIChat ref={aiChatRef} query={lastQuery} categorized={categorized} />
+      <AIChat ref={aiChatRef} query={lastQuery} categorized={categorized} onSearchQuery={handleChatSearch} />
 
       {/* LINE OAuth callback: auto-open alert modal with pre-filled userId */}
       {lineCallbackFlight && lineCallbackUserId && (

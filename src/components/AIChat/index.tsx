@@ -8,14 +8,21 @@ export interface AIChatHandle {
   openWithMessage: (message: string, context?: string) => void
 }
 
+interface FlightSearch {
+  query: string
+  label: string
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+  flightSearches?: FlightSearch[]
 }
 
 interface Props {
   query: SearchQuery | null
   categorized: CategorizedFlights | null
+  onSearchQuery?: (rawQuery: string) => void
 }
 
 const DEFAULT_SUGGESTIONS = [
@@ -62,7 +69,7 @@ function TypingDots() {
   )
 }
 
-const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categorized }, ref) {
+const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categorized, onSearchQuery }, ref) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -104,7 +111,11 @@ const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categori
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'エラーが発生しました')
-      setMessages([...next, { role: 'assistant', content: data.content }])
+      setMessages([...next, {
+        role: 'assistant',
+        content: data.content,
+        flightSearches: data.flightSearches ?? [],
+      }])
     } catch (err) {
       setMessages([...next, {
         role: 'assistant',
@@ -186,20 +197,35 @@ const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categori
             </div>
           ) : (
             messages.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={[
-                    'max-w-[82%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap',
-                    msg.role === 'user'
-                      ? 'bg-indigo-600 text-white rounded-br-sm'
-                      : 'bg-gray-100 text-gray-800 rounded-bl-sm',
-                  ].join(' ')}
-                >
-                  {msg.content}
+              <div key={i} className="space-y-1.5">
+                <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div
+                    className={[
+                      'max-w-[82%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap',
+                      msg.role === 'user'
+                        ? 'bg-indigo-600 text-white rounded-br-sm'
+                        : 'bg-gray-100 text-gray-800 rounded-bl-sm',
+                    ].join(' ')}
+                  >
+                    {msg.content}
+                  </div>
                 </div>
+                {msg.role === 'assistant' && msg.flightSearches && msg.flightSearches.length > 0 && (
+                  <div className="space-y-1.5 pl-1">
+                    {msg.flightSearches.map((fs) => (
+                      <button
+                        key={fs.query}
+                        onClick={() => {
+                          setIsOpen(false)
+                          onSearchQuery?.(fs.query)
+                        }}
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg px-4 py-2 flex items-center justify-center gap-2 transition-colors"
+                      >
+                        {fs.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ))
           )}

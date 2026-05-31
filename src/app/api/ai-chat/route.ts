@@ -5,7 +5,12 @@ const BASE_SYSTEM = `あなたはNomad Hopperの旅行AIアシスタントです
 ユーザーの航空券探しや旅行計画を日本語でサポートします。
 現在の検索情報（出発地・目的地・日程・価格データ）が提供される場合はそれを参考に回答してください。
 陸マイラー戦略、最安値の見つけ方、旅程の最適化なども得意です。
-返答は簡潔で親しみやすいトーンで。`
+返答は簡潔で親しみやすいトーンで。
+
+【重要】具体的な旅程を提案する場合（都市名・日程・ルートを明示する場合）は、回答本文の末尾に以下のJSON構造を含めること。最大2件まで。一般的なアドバイスのみの場合はタグ不要。
+<flight_search>
+{"query": "検索欄に入れるテキスト（例：3月10日に東京からバンコクへ）", "label": "🔍 東京→バンコク 3月10日を検索"}
+</flight_search>`
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -103,6 +108,17 @@ export async function POST(request: NextRequest) {
   }
 
   const data = await claudeRes.json()
-  const content: string = data.content?.[0]?.text ?? ''
-  return Response.json({ content })
+  const raw: string = data.content?.[0]?.text ?? ''
+
+  // Extract <flight_search> tags before stripping them from the display content
+  const flightSearches: Array<{ query: string; label: string }> = []
+  for (const m of raw.matchAll(/<flight_search>\s*([\s\S]*?)\s*<\/flight_search>/g)) {
+    try {
+      const parsed = JSON.parse(m[1].trim())
+      if (parsed.query && parsed.label) flightSearches.push(parsed)
+    } catch {}
+  }
+  const content = raw.replace(/<flight_search>[\s\S]*?<\/flight_search>/g, '').trim()
+
+  return Response.json({ content, flightSearches })
 }
