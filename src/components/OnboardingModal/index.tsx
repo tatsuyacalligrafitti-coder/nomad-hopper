@@ -236,7 +236,12 @@ function Page6({ onClose }: { onClose: () => void }) {
   )
 }
 
-export default function OnboardingModal() {
+interface Props {
+  forcedOpen?: boolean
+  onForcedClose?: () => void
+}
+
+export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [page, setPage] = useState(0)
 
@@ -246,10 +251,18 @@ export default function OnboardingModal() {
     }
   }, [])
 
+  // Reset to page 0 whenever externally opened
+  useEffect(() => {
+    if (forcedOpen) setPage(0)
+  }, [forcedOpen])
+
+  const isVisible = isOpen || !!forcedOpen
+
   const close = () => {
     localStorage.setItem(STORAGE_KEY, 'true')
     setIsOpen(false)
     setPage(0)
+    onForcedClose?.()
   }
 
   const openHelp = () => {
@@ -260,7 +273,7 @@ export default function OnboardingModal() {
   return (
     <>
       {/* Backdrop + modal */}
-      {isOpen && (
+      {isVisible && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/50"
           onClick={(e) => { if (e.target === e.currentTarget) close() }}
@@ -354,10 +367,10 @@ export default function OnboardingModal() {
         </div>
       )}
 
-      {/* Help button — always visible */}
+      {/* Help button — mobile only */}
       <button
         onClick={openHelp}
-        className="fixed bottom-4 left-4 bg-white border border-gray-200 rounded-full w-10 h-10 shadow-md flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:border-indigo-300 transition-colors z-40"
+        className="md:hidden fixed bottom-4 left-4 bg-white border border-gray-200 rounded-full w-10 h-10 shadow-md flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:border-indigo-300 transition-colors z-40"
         aria-label="使い方を見る"
       >
         ？
