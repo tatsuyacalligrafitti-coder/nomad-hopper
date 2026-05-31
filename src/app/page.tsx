@@ -626,6 +626,17 @@ export default function HomePage() {
 
       </main>
 
+      <div className="text-center py-6 border-t border-gray-100">
+        <a
+          href="https://forms.gle/onzBchqN7EL3yUtj8"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-indigo-600 border border-gray-200 hover:border-indigo-300 rounded-full px-5 py-2 transition-colors hover:bg-indigo-50"
+        >
+          📝 使ってみた感想を教えてください
+        </a>
+      </div>
+
       <footer className="text-center text-xs text-gray-400 py-6 border-t border-gray-100 mt-4">
         2026 Tobira · 世界への扉を、あなたの手に。
       </footer>
