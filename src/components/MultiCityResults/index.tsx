@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Loader2, Plane, Sparkles, Send } from 'lucide-react'
+import { Loader2, Plane, Sparkles, Send, GripVertical } from 'lucide-react'
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -85,25 +85,48 @@ const JAPAN_AIRPORTS = new Set(['NRT', 'HND', 'KIX', 'ITM', 'NGO', 'NKM', 'OSA',
 
 type OrderedSegment = MultiCitySegmentResult & { _id: string }
 
-function SortableSegmentWrapper({ id, children }: {
+function SortableSegmentWrapper({ id, showHint, isActiveElsewhere, children }: {
   id: string
+  showHint?: boolean
+  isActiveElsewhere?: boolean
   children: (handle: React.ReactNode, isDragging: boolean) => React.ReactNode
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
   const style = { transform: CSS.Transform.toString(transform), transition }
   const handle = (
-    <button
-      {...attributes}
-      {...listeners}
-      className="text-gray-300 hover:text-gray-400 cursor-grab active:cursor-grabbing touch-none shrink-0 select-none leading-none"
-      tabIndex={-1}
-      aria-label="ドラッグして並び替え"
-    >
-      ⠿
-    </button>
+    <div className="flex-shrink-0 flex items-center">
+      {/* 紫アクセントバー */}
+      <div className="w-1 self-stretch bg-indigo-300 rounded-l-xl mr-1" />
+      {/* ドラッグハンドル本体 */}
+      <div
+        {...listeners}
+        {...attributes}
+        className="
+          flex flex-col items-center justify-center
+          w-10 self-stretch
+          cursor-grab active:cursor-grabbing
+          text-gray-300 hover:text-indigo-500
+          hover:bg-indigo-50
+          transition-colors duration-150
+          touch-none select-none
+          rounded-l-lg
+          relative
+        "
+        aria-label="ドラッグして並び替え"
+      >
+        {showHint && (
+          <span className="absolute -top-3 animate-bounce text-indigo-400 text-xs pointer-events-none">↕</span>
+        )}
+        <GripVertical size={24} />
+      </div>
+    </div>
   )
   return (
-    <div ref={setNodeRef} style={style}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={isActiveElsewhere && !isDragging ? 'opacity-60 transition-opacity duration-150' : ''}
+    >
       {children(handle, isDragging)}
     </div>
   )
@@ -285,6 +308,11 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
     () => (result?.segments ?? []).map((seg, i) => ({ ...seg, _id: `seg-${i}` }))
   )
   const [isReordered, setIsReordered] = useState(false)
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [showDragHint, setShowDragHint] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return !localStorage.getItem('tobira_drag_hint_shown')
+  })
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -473,7 +501,12 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
   }
 
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null)
     const { active, over } = event
+    if (showDragHint) {
+      localStorage.setItem('tobira_drag_hint_shown', 'true')
+      setShowDragHint(false)
+    }
     if (!over || active.id === over.id) return
     setOrderedSegments(prev => {
       const oldIndex = prev.findIndex(s => s._id === active.id)
@@ -556,7 +589,13 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
 
       {/* Timeline */}
       <div className="p-5">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={e => setActiveId(String(e.active.id))}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveId(null)}
+        >
           {/* First origin city node */}
           <div className="flex items-center gap-3">
             <div className="flex flex-col items-center shrink-0">
@@ -579,7 +618,12 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
             const destLabel = getCityLabel(seg.destination, seg.destinationCity)
 
             return (
-              <SortableSegmentWrapper key={seg._id} id={seg._id}>
+              <SortableSegmentWrapper
+                key={seg._id}
+                id={seg._id}
+                showHint={showDragHint && ci === 0}
+                isActiveElsewhere={activeId !== null && activeId !== seg._id}
+              >
               {(handle, isDragging) => (
               <>
                 {/* Flight connector */}
@@ -587,9 +631,15 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                   <div className="flex flex-col items-center shrink-0 w-3">
                     <div className="w-0.5 bg-purple-200 flex-1" />
                   </div>
-                  <div className="flex-1 mb-2 flex items-start gap-1.5">
-                    <div className="mt-4 shrink-0">{handle}</div>
-                    <div className={`flex-1 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 my-1 ${isDragging ? 'shadow-lg opacity-90' : ''}`}>
+                  <div className="flex-1 mb-2 my-1">
+                    <div className={[
+                      'flex rounded-xl border overflow-hidden',
+                      isDragging
+                        ? 'scale-[1.02] shadow-2xl border-2 border-indigo-400 bg-white relative z-50'
+                        : 'border-gray-100 bg-gray-50',
+                    ].join(' ')}>
+                    {handle}
+                    <div className="flex-1 px-3 py-2.5">
                         {(retryingSegments?.has(ci)) ? (
                           <div className="flex items-center gap-2 text-xs text-indigo-500 py-1">
                             <Loader2 size={14} className="animate-spin shrink-0" />
@@ -754,6 +804,7 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                       </div>
                     </div>
                   </div>
+                </div>
 
                 {/* Destination city node */}
                 <div className="flex items-center gap-3">
