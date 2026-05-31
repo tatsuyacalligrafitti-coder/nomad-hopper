@@ -157,6 +157,17 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
 
     // Single-city validation
     const sq = p as ParsedQuery | null
+
+    // Date missing but at least one city known → explore fallback (no error shown)
+    if (!sq?.departureDate && (sq?.origin || sq?.destination)) {
+      if (onExplore) {
+        onExplore({ origin: sq?.origin ?? undefined, destination: sq?.destination ?? undefined, rawQuery })
+      } else {
+        setError('日程を認識できませんでした（例: 12月25日、来週）')
+      }
+      return
+    }
+
     if (!sq?.origin) {
       setError('出発地を認識できませんでした（例: 東京から、HND）')
       return
@@ -167,11 +178,7 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
     }
     if (!sq?.departureDate) {
       if (onExplore) {
-        onExplore({
-          origin: sq?.origin ?? undefined,
-          destination: sq?.destination ?? undefined,
-          rawQuery,
-        })
+        onExplore({ origin: sq.origin, destination: sq.destination, rawQuery })
       } else {
         setError('日程を認識できませんでした（例: 12月25日、来週）')
       }
