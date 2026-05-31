@@ -970,7 +970,21 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
           </div>
         )}
 
-        {/* AI analysis trigger — primary action, shown above reorder button */}
+        {/* Reorder re-calculate button — secondary action, above AI analysis */}
+        <button
+          onClick={handleReorderSearch}
+          disabled={!isReordered}
+          className={[
+            'mt-4 w-full rounded-lg py-3 flex items-center justify-center gap-2 text-sm font-medium transition-colors',
+            isReordered
+              ? 'border-2 border-indigo-500 text-indigo-600 bg-white hover:bg-indigo-50'
+              : 'border border-gray-200 text-gray-400 bg-white cursor-default',
+          ].join(' ')}
+        >
+          {isReordered ? '🔄 この旅程で再計算する' : '✓ 最新の金額です'}
+        </button>
+
+        {/* AI analysis trigger — primary action, below reorder button */}
         {!analysis && (
           <>
             <button
@@ -1191,19 +1205,6 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
           </div>
         )}
 
-        {/* Reorder re-calculate button — secondary action, always below AI section */}
-        <button
-          onClick={handleReorderSearch}
-          disabled={!isReordered}
-          className={[
-            'mt-3 w-full rounded-lg py-3 flex items-center justify-center gap-2 text-sm font-medium transition-colors',
-            isReordered
-              ? 'border-2 border-indigo-500 text-indigo-600 bg-white hover:bg-indigo-50'
-              : 'border border-gray-200 text-gray-400 bg-white cursor-default',
-          ].join(' ')}
-        >
-          {isReordered ? '🔄 この旅程で再計算する' : '✓ 最新の金額です'}
-        </button>
       </div>
     </div>
 
