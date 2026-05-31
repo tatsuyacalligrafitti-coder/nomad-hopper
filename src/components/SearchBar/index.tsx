@@ -5,13 +5,6 @@ import { Search, Loader2, MapPin, Calendar, Users, Plane } from 'lucide-react'
 import { parseSearchQuery } from '@/lib/parser'
 import type { SearchQuery, ParsedQuery, MultiCityParsedQuery } from '@/types'
 
-const EXAMPLES = [
-  '🇹🇭 東京からバンコクへ 来月',
-  '🇰🇪 東京からケニアへ 夏休み',
-  '🇬🇧 東京からロンドンへ 年末',
-  '🇵🇭 大阪からマニラへ 3泊',
-]
-
 const PLACEHOLDER_EXAMPLES = [
   '東京からバンコクへ 12月25日 1名',
   '予算10万円でGWに南の島へのんびり行きたい',
@@ -211,18 +204,6 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
           </button>
         </div>
       </form>
-
-      <div className="flex flex-wrap gap-2">
-        {EXAMPLES.map((ex) => (
-          <button
-            key={ex}
-            onClick={() => setRawQuery(ex)}
-            className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-full px-3 py-1 transition-colors"
-          >
-            {ex}
-          </button>
-        ))}
-      </div>
 
       {/* Multi-city preview */}
       {parsed && isMultiCity(parsed) && (
