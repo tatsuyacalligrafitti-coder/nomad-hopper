@@ -94,14 +94,14 @@ export default function AIExploreChat({ origin, destination, rawQuery, onSearch,
     }
   }
 
-  const handleSend = async () => {
-    const trimmed = chatInput.trim()
+  const handleSend = async (textOverride?: string) => {
+    const trimmed = (textOverride ?? chatInput).trim()
     if (!trimmed || isLoading) return
 
     const userMsg: ExploreMessage = { role: 'user', content: trimmed }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages)
-    setChatInput('')
+    if (!textOverride) setChatInput('')
     setIsLoading(true)
 
     try {
@@ -167,7 +167,7 @@ export default function AIExploreChat({ origin, destination, rawQuery, onSearch,
                     {msg.suggestedDates.map((date, di) => (
                       <button
                         key={di}
-                        onClick={() => handleDateSelect(date)}
+                        onClick={() => handleSend(date.label)}
                         className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
                       >
                         💡 {date.label}
@@ -208,7 +208,7 @@ export default function AIExploreChat({ origin, destination, rawQuery, onSearch,
             className="flex-1 resize-none outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent max-h-32 overflow-y-auto"
           />
           <button
-            onClick={handleSend}
+            onClick={() => handleSend()}
             disabled={!chatInput.trim() || isLoading}
             className="shrink-0 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-200 text-white rounded-xl p-2 transition-colors"
           >
