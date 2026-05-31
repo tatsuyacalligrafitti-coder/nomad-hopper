@@ -2,6 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Loader2, Plane, Sparkles, Send } from 'lucide-react'
+import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { IATA_JP_NAMES } from '@/lib/iata-names'
 import { aviasalesLink } from '@/lib/travelpayouts'
 import { getRouteEstimate, getPriceBadge, getPriceBadgeLabel, getPriceBadgeColor } from '@/lib/route-estimates'
@@ -53,6 +56,7 @@ interface Props {
   aiConsultMessage?: string | null
   onDismissWarning?: () => void
   onOpenFloatingChat?: (message: string) => void
+  onReorderSearch?: (segments: Array<{ origin: string; destination: string; date: string }>) => void
 }
 
 const NEARBY_AIRPORTS: Record<string, { code: string; name: string }[]> = {
@@ -78,6 +82,32 @@ const NEARBY_AIRPORTS: Record<string, { code: string; name: string }[]> = {
 }
 
 const JAPAN_AIRPORTS = new Set(['NRT', 'HND', 'KIX', 'ITM', 'NGO', 'NKM', 'OSA', 'FUK', 'CTS', 'OKA', 'SDJ', 'KMJ', 'KOJ'])
+
+type OrderedSegment = MultiCitySegmentResult & { _id: string }
+
+function SortableSegmentWrapper({ id, children }: {
+  id: string
+  children: (handle: React.ReactNode, isDragging: boolean) => React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style = { transform: CSS.Transform.toString(transform), transition }
+  const handle = (
+    <button
+      {...attributes}
+      {...listeners}
+      className="text-gray-300 hover:text-gray-400 cursor-grab active:cursor-grabbing touch-none shrink-0 select-none leading-none"
+      tabIndex={-1}
+      aria-label="ドラッグして並び替え"
+    >
+      ⠿
+    </button>
+  )
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children(handle, isDragging)}
+    </div>
+  )
+}
 
 function getNoFlightReason(origin: string, destination: string): string {
   if (JAPAN_AIRPORTS.has(origin.toUpperCase()) && JAPAN_AIRPORTS.has(destination.toUpperCase())) {
@@ -225,7 +255,7 @@ function TypingDots() {
   )
 }
 
-export default function MultiCityResults({ result, isLoading, error, onReSearch, onRetrySegment, retryingSegments, initialSelectedFlights, forcedSelections, mode, rawQuery, warningMessage, aiConsultMessage, onDismissWarning, onOpenFloatingChat }: Props) {
+export default function MultiCityResults({ result, isLoading, error, onReSearch, onRetrySegment, retryingSegments, initialSelectedFlights, forcedSelections, mode, rawQuery, warningMessage, aiConsultMessage, onDismissWarning, onOpenFloatingChat, onReorderSearch }: Props) {
   // ── AI analysis state ────────────────────────────────────────────────────────
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<MultiCityAnalysis | null>(null)
@@ -250,10 +280,25 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
   const [changeComment, setChangeComment] = useState<string | null>(null)
   const [isChangingFlight, setIsChangingFlight] = useState(false)
 
+  // ── Drag-and-drop reorder state ───────────────────────────────────────────────
+  const [orderedSegments, setOrderedSegments] = useState<OrderedSegment[]>(
+    () => (result?.segments ?? []).map((seg, i) => ({ ...seg, _id: `seg-${i}` }))
+  )
+  const [isReordered, setIsReordered] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
   // Reset selections when a new search result arrives
   useEffect(() => {
     setSelectedFlights(initialSelectedFlights ?? {})
     setChangeComment(null)
+    if (result) {
+      setOrderedSegments(result.segments.map((seg, i) => ({ ...seg, _id: `seg-${i}` })))
+      setIsReordered(false)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result])
 
@@ -264,6 +309,10 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
       setAnalysis(null)
       setAnalysisError('')
       setChatMessages([])
+      if (result) {
+        setOrderedSegments(result.segments.map((seg, i) => ({ ...seg, _id: `seg-${i}` })))
+        setIsReordered(false)
+      }
     }
   }, [forcedSelections])
 
@@ -423,6 +472,27 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
     }
   }
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setOrderedSegments(prev => {
+      const oldIndex = prev.findIndex(s => s._id === active.id)
+      const newIndex = prev.findIndex(s => s._id === over.id)
+      if (oldIndex === -1 || newIndex === -1) return prev
+      return arrayMove(prev, oldIndex, newIndex)
+    })
+    setIsReordered(true)
+    setSelectedFlights({})
+    setAnalysis(null)
+    setAnalysisError('')
+    setChatMessages([])
+  }
+
+  const handleReorderSearch = () => {
+    if (!isReordered) return
+    onReorderSearch?.(orderedSegments.map(s => ({ origin: s.origin, destination: s.destination, date: s.date })))
+  }
+
   // ── Loading / error states ────────────────────────────────────────────────────
   if (isLoading) {
     return (
@@ -468,17 +538,11 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
 
   // ── Computed totals (reflect flight selections) ───────────────────────────────
   const isCustom = Object.values(selectedFlights).some(idx => idx !== 0)
-  const totalPrice = result.segments.reduce((sum, seg, idx) => {
+  const totalPrice = orderedSegments.reduce((sum, seg, idx) => {
     const selIdx = selectedFlights[idx] ?? 0
     const f = (seg.top5Flights ?? [])[selIdx]
     return sum + (f?.totalPrice ?? seg.cheapestPrice ?? 0)
   }, 0)
-
-  // ── City nodes for timeline ───────────────────────────────────────────────────
-  const cityNodes: Array<{ iata: string; cityFromApi?: string }> = [
-    { iata: result.segments[0].origin, cityFromApi: result.segments[0].originCity },
-    ...result.segments.map((s) => ({ iata: s.destination, cityFromApi: s.destinationCity })),
-  ]
 
   return (
     <>
@@ -492,40 +556,40 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
 
       {/* Timeline */}
       <div className="p-5">
-        <div className="space-y-0">
-          {cityNodes.map(({ iata, cityFromApi }, ci) => {
-            const isLast = ci === cityNodes.length - 1
-            const seg = !isLast ? result.segments[ci] : null
-            const selectedIdx = !isLast ? (selectedFlights[ci] ?? 0) : 0
-            const flight = !isLast
-              ? ((seg?.top5Flights ?? [])[selectedIdx] ?? seg?.cheapestFlight ?? null)
-              : null
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          {/* First origin city node */}
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-center shrink-0">
+              <div className="w-3 h-3 rounded-full bg-purple-600 ring-2 ring-purple-200" />
+              <div className="w-0.5 bg-purple-200 flex-1 min-h-[60px]" />
+            </div>
+            <p className="font-bold text-gray-900 text-sm">
+              {getCityLabel(orderedSegments[0]?.origin ?? '', orderedSegments[0]?.originCity)}
+              <span className="ml-1.5 text-xs font-normal text-gray-400">({orderedSegments[0]?.origin})</span>
+            </p>
+          </div>
+
+          <SortableContext items={orderedSegments.map(s => s._id)} strategy={verticalListSortingStrategy}>
+          {orderedSegments.map((seg, ci) => {
+            const isLast = ci === orderedSegments.length - 1
+            const selectedIdx = selectedFlights[ci] ?? 0
+            const flight = (seg.top5Flights ?? [])[selectedIdx] ?? seg?.cheapestFlight ?? null
             const carrier = flight?.segments[0]?.carrierName ?? ''
             const duration = flight?.totalDuration ?? 0
-            const label = getCityLabel(iata, cityFromApi)
+            const destLabel = getCityLabel(seg.destination, seg.destinationCity)
 
             return (
-              <div key={ci}>
-                {/* City node */}
-                <div className="flex items-center gap-3">
-                  <div className="flex flex-col items-center shrink-0">
-                    <div className="w-3 h-3 rounded-full bg-purple-600 ring-2 ring-purple-200" />
-                    {!isLast && <div className="w-0.5 bg-purple-200 flex-1 min-h-[60px]" />}
-                  </div>
-                  <p className="font-bold text-gray-900 text-sm">
-                    {label}
-                    <span className="ml-1.5 text-xs font-normal text-gray-400">({iata})</span>
-                  </p>
-                </div>
-
+              <SortableSegmentWrapper key={seg._id} id={seg._id}>
+              {(handle, isDragging) => (
+              <>
                 {/* Flight connector */}
-                {seg && (
-                  <div className="flex items-stretch gap-3">
-                    <div className="flex flex-col items-center shrink-0 w-3">
-                      <div className="w-0.5 bg-purple-200 flex-1" />
-                    </div>
-                    <div className="flex-1 mb-2">
-                      <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 my-1">
+                <div className="flex items-stretch gap-3">
+                  <div className="flex flex-col items-center shrink-0 w-3">
+                    <div className="w-0.5 bg-purple-200 flex-1" />
+                  </div>
+                  <div className="flex-1 mb-2 flex items-start gap-1.5">
+                    <div className="mt-4 shrink-0">{handle}</div>
+                    <div className={`flex-1 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 my-1 ${isDragging ? 'shadow-lg opacity-90' : ''}`}>
                         {(retryingSegments?.has(ci)) ? (
                           <div className="flex items-center gap-2 text-xs text-indigo-500 py-1">
                             <Loader2 size={14} className="animate-spin shrink-0" />
@@ -557,11 +621,16 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
                                   <div className="text-right">
-                                    <p className="text-base font-bold text-purple-700 tabular-nums">
-                                      ¥{Math.round(selectedPrice).toLocaleString()}
-                                    </p>
+                                    <div className="flex items-center gap-1.5">
+                                      <p className={`text-base font-bold tabular-nums ${isReordered ? 'text-gray-400' : 'text-purple-700'}`}>
+                                        ¥{Math.round(selectedPrice).toLocaleString()}
+                                      </p>
+                                      {isReordered && (
+                                        <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded">要再計算</span>
+                                      )}
+                                    </div>
                                     <div className="flex items-center gap-1 justify-end flex-wrap">
-                                      {isSelected0 ? (
+                                      {!isReordered && isSelected0 ? (
                                         <>
                                           <p className="text-xs text-gray-400">片道最安値</p>
                                           {badgeEmoji && badgeLabel && badgeColor && (
@@ -570,9 +639,9 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                                             </span>
                                           )}
                                         </>
-                                      ) : (
+                                      ) : !isReordered ? (
                                         <span className="text-xs font-medium text-amber-600">カスタム選択中</span>
-                                      )}
+                                      ) : null}
                                     </div>
                                     {estimate && (
                                       <p className="text-xs text-gray-300 mt-0.5">
@@ -685,11 +754,25 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
+
+                {/* Destination city node */}
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-center shrink-0">
+                    <div className="w-3 h-3 rounded-full bg-purple-600 ring-2 ring-purple-200" />
+                    {!isLast && <div className="w-0.5 bg-purple-200 flex-1 min-h-[60px]" />}
+                  </div>
+                  <p className="font-bold text-gray-900 text-sm">
+                    {destLabel}
+                    <span className="ml-1.5 text-xs font-normal text-gray-400">({seg.destination})</span>
+                  </p>
+                </div>
+              </>
+              )}
+              </SortableSegmentWrapper>
             )
           })}
-        </div>
+          </SortableContext>
+        </DndContext>
 
         {/* AI flight-change comment */}
         {(isChangingFlight || changeComment) && (
@@ -772,6 +855,20 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
             </div>
           </div>
         )}
+
+        {/* Reorder re-calculate button */}
+        <button
+          onClick={handleReorderSearch}
+          disabled={!isReordered}
+          className={[
+            'mt-4 w-full rounded-lg py-2.5 text-sm font-medium transition-colors',
+            isReordered
+              ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+              : 'text-gray-400 border border-gray-200 cursor-default',
+          ].join(' ')}
+        >
+          {isReordered ? '🔄 この旅程で再計算する' : '✓ 最新の金額です'}
+        </button>
 
         {/* AI analysis trigger */}
         {!analysis && (

@@ -322,6 +322,34 @@ export default function HomePage() {
     }
   }
 
+  const handleReorderSearch = async (newSegments: Array<{ origin: string; destination: string; date: string }>) => {
+    if (!lastMultiCityParsedQuery) return
+    setIsMultiCityLoading(true)
+    setMultiCityError('')
+    try {
+      const res = await fetch('/api/search-multi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          segments: newSegments,
+          passengers: lastMultiCityParsedQuery.passengers,
+          cabinClass: lastMultiCityParsedQuery.cabinClass,
+        }),
+      })
+      const data = await res.json() as MultiCitySearchResult
+      if (!res.ok) throw new Error((data as unknown as { error?: string }).error ?? '検索に失敗しました')
+      setMultiCityResult(data)
+      setBaseMultiCityResult(data)
+      const zeroSels: Record<number, number> = {}
+      data.segments.forEach((_, i) => { zeroSels[i] = 0 })
+      setMultiCityForcedSelections(zeroSels)
+    } catch (err) {
+      setMultiCityError(err instanceof Error ? err.message : '検索に失敗しました')
+    } finally {
+      setIsMultiCityLoading(false)
+    }
+  }
+
   const retrySegment = async (segmentIndex: number, newDate?: string, newOrigin?: string, newDest?: string) => {
     if (!multiCityResult || !lastMultiCityParsedQuery) return
     const seg = multiCityResult.segments[segmentIndex]
@@ -543,6 +571,7 @@ export default function HomePage() {
             aiConsultMessage={multiCityWarning?.consultMessage}
             onDismissWarning={() => setMultiCityWarning(null)}
             onOpenFloatingChat={(msg) => aiChatRef.current?.openWithMessage(msg, multiCityWarning?.contextSummary)}
+            onReorderSearch={handleReorderSearch}
             onReSearch={(q) => {
               const raw = `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`
               searchBarRef.current?.setQuery(raw)
