@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Loader2, Plane, Sparkles, Send, GripVertical } from 'lucide-react'
-import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { DndContext, closestCenter, MouseSensor, TouchSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { IATA_JP_NAMES } from '@/lib/iata-names'
@@ -313,9 +313,14 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
     if (typeof window === 'undefined') return false
     return !localStorage.getItem('tobira_drag_hint_shown')
   })
+  const [segmentHistory, setSegmentHistory] = useState<string[][]>(
+    () => [(result?.segments ?? []).map((_, i) => `seg-${i}`)]
+  )
+  const [historyIndex, setHistoryIndex] = useState(0)
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
@@ -324,8 +329,11 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
     setSelectedFlights(initialSelectedFlights ?? {})
     setChangeComment(null)
     if (result) {
-      setOrderedSegments(result.segments.map((seg, i) => ({ ...seg, _id: `seg-${i}` })))
+      const newSegs = result.segments.map((seg, i) => ({ ...seg, _id: `seg-${i}` }))
+      setOrderedSegments(newSegs)
       setIsReordered(false)
+      setSegmentHistory([newSegs.map(s => s._id)])
+      setHistoryIndex(0)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result])
@@ -338,8 +346,11 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
       setAnalysisError('')
       setChatMessages([])
       if (result) {
-        setOrderedSegments(result.segments.map((seg, i) => ({ ...seg, _id: `seg-${i}` })))
+        const newSegs = result.segments.map((seg, i) => ({ ...seg, _id: `seg-${i}` }))
+        setOrderedSegments(newSegs)
         setIsReordered(false)
+        setSegmentHistory([newSegs.map(s => s._id)])
+        setHistoryIndex(0)
       }
     }
   }, [forcedSelections])
@@ -508,18 +519,35 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
       setShowDragHint(false)
     }
     if (!over || active.id === over.id) return
-    setOrderedSegments(prev => {
-      const oldIndex = prev.findIndex(s => s._id === active.id)
-      const newIndex = prev.findIndex(s => s._id === over.id)
-      if (oldIndex === -1 || newIndex === -1) return prev
-      return arrayMove(prev, oldIndex, newIndex)
-    })
+    const oldIndex = orderedSegments.findIndex(s => s._id === active.id)
+    const newIndex = orderedSegments.findIndex(s => s._id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+    const newOrder = arrayMove(orderedSegments, oldIndex, newIndex)
+    const trimmed = segmentHistory.slice(0, historyIndex + 1)
+    setOrderedSegments(newOrder)
+    setSegmentHistory([...trimmed, newOrder.map(s => s._id)])
+    setHistoryIndex(trimmed.length)
     setIsReordered(true)
     setSelectedFlights({})
     setAnalysis(null)
     setAnalysisError('')
     setChatMessages([])
   }
+
+  const applyHistoryAt = (newIndex: number) => {
+    const ids = segmentHistory[newIndex]
+    setOrderedSegments(prev => ids.map(id => prev.find(s => s._id === id)!).filter(Boolean) as OrderedSegment[])
+    setHistoryIndex(newIndex)
+    setIsReordered(newIndex > 0)
+    setSelectedFlights({})
+    setAnalysis(null)
+    setAnalysisError('')
+    setChatMessages([])
+  }
+
+  const handleUndo = () => { if (historyIndex > 0) applyHistoryAt(historyIndex - 1) }
+  const handleRedo = () => { if (historyIndex < segmentHistory.length - 1) applyHistoryAt(historyIndex + 1) }
+  const handleReset = () => { if (historyIndex > 0) applyHistoryAt(0) }
 
   const handleReorderSearch = () => {
     if (!isReordered) return
@@ -907,12 +935,40 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
           </div>
         )}
 
+        {/* Undo / Redo / Reset */}
+        {segmentHistory.length > 1 && (
+          <div className="flex gap-2 mb-2 mt-4">
+            <button
+              onClick={handleUndo}
+              disabled={historyIndex <= 0}
+              className="flex-1 flex items-center justify-center gap-1 border border-gray-200 rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              ← 戻す
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={historyIndex >= segmentHistory.length - 1}
+              className="flex-1 flex items-center justify-center gap-1 border border-gray-200 rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              進む →
+            </button>
+            <button
+              onClick={handleReset}
+              disabled={historyIndex === 0}
+              className="flex-1 flex items-center justify-center gap-1 border border-gray-200 rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              ↺ リセット
+            </button>
+          </div>
+        )}
+
         {/* Reorder re-calculate button */}
         <button
           onClick={handleReorderSearch}
           disabled={!isReordered}
           className={[
-            'mt-4 w-full rounded-lg py-2.5 text-sm font-medium transition-colors',
+            'w-full rounded-lg py-2.5 text-sm font-medium transition-colors',
+            segmentHistory.length <= 1 ? 'mt-4' : '',
             isReordered
               ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
               : 'text-gray-400 border border-gray-200 cursor-default',
