@@ -453,10 +453,14 @@ export default function HomePage() {
       const parsed = await res.json()
       if (parsed?.type === 'multi-city') {
         handleMultiCitySearch(parsed, rawQuery)
-      } else if (parsed?.origin && parsed?.destination) {
+      } else if (parsed?.origin && parsed?.destination && parsed?.departureDate) {
         handleSearch(parsed)
       }
-    } catch {}
+      // If parse returns incomplete data (no date/airports), leave the query
+      // in the search bar so the user can refine it manually — no error shown.
+    } catch {
+      // Network or parse error: silently leave query in search bar
+    }
   }
 
   const handleSearch = async (query: SearchQuery) => {
@@ -517,7 +521,7 @@ export default function HomePage() {
         {/* Mode selector - always visible */}
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            {searched ? '並び替えモード' : 'どんな旅を探していますか？'}
+            どんな旅を探していますか？
           </p>
           <ModeSelector selected={mode} onChange={handleModeChange} />
           {!searched && (
