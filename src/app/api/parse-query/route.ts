@@ -262,6 +262,55 @@ function tryParseMultiCity(query: string): MultiCityParsedQuery | null {
     }
   }
 
+  // ── Pattern 7: "X を出発して A、B、C を順に回り [date] に X へ戻る" ────────
+  // Handles comma/と separated stop lists where intermediate stops have no dates.
+  // e.g. "3月10日に東京を出発してバンコク、ドバイ、ロンドンを順に回り3月28日に東京へ戻る"
+  // Also handles: "AからB、CとDを経由して[date]に戻る"
+  {
+    const mJunni = query.match(
+      /(?:\d{1,2}月\d{1,2}日[にへで])?([^\d、，,。\s]{1,15}?)(?:を出発して|から)(.+?)を(?:順に)?(?:回り|回って|巡り|経由し).*?(\d{1,2}月\d{1,2}日|\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2})[にへで]?(.{0,15}?)(?:へ|に)(?:戻る|もどる|帰る)/
+    )
+    if (mJunni) {
+      const origin = resolveCity(mJunni[1])
+      const stopsText = mJunni[2]
+      const returnDate = parseDate(mJunni[3])
+      const returnCity = mJunni[4].trim() ? resolveCity(mJunni[4].trim()) : null
+
+      const stops = stopsText
+        .split(/[、，,とや]/)
+        .map(s => s.trim().replace(/[にへでは]\s*$/, ''))
+        .filter(Boolean)
+        .map(s => resolveCity(s))
+        .filter((c): c is string => !!c)
+
+      if (origin && stops.length >= 1 && returnDate) {
+        const finalDest = returnCity ?? origin
+        // Departure date = first date in query that is NOT the return date
+        const allDates = [...query.matchAll(/(\d{1,2}月\d{1,2}日|\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2})/g)]
+          .map(m => parseDate(m[0]))
+          .filter((d): d is string => d !== null && d !== returnDate)
+        const depDate = allDates[0] ?? addDays(returnDate, -(stops.length + 1) * 5)
+
+        // Distribute intermediate dates evenly between departure and return
+        const totalDays = Math.max(stops.length, Math.round(
+          (new Date(returnDate).getTime() - new Date(depDate).getTime()) / (1000 * 60 * 60 * 24),
+        ))
+        const interval = Math.floor(totalDays / (stops.length + 1))
+
+        const allCities = [origin, ...stops, finalDest]
+        const segments: MultiCitySegmentQuery[] = allCities.slice(0, -1).map((city, i) => ({
+          origin: city,
+          destination: allCities[i + 1],
+          date: i === 0 ? depDate
+              : i === allCities.length - 2 ? returnDate
+              : addDays(depDate, i * interval),
+        }))
+
+        return { type: 'multi-city', segments, passengers, cabinClass }
+      }
+    }
+  }
+
   // ── Pattern 5: Date+city enumeration ─────────────────────────────────────
   // Handles queries where each stop is expressed as "[date] + [city]":
   //   "東京から7月3日にバンコク、7月8日にプラハ、7月14日に東京へ戻る"
