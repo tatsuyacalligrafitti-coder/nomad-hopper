@@ -134,9 +134,12 @@ function tryParseMultiCity(query: string): MultiCityParsedQuery | null {
   // ── Pattern 2: 経由 (via) ────────────────────────────────────────────────
   // "東京からバンコク経由でナイロビへ"
   // "12月15日に東京を出発してドバイ経由でロンドンへ"
+  // "5月にNYからLA経由でメキシコシティへ、そのまま東京へ帰る"
   const viaMatch = query.match(/(.+?)(?:から|を出発して)(.+?)経由.{0,4}で(.+?)へ/)
   if (viaMatch) {
-    const origin = resolveCity(viaMatch[1])
+    // Strip leading date/month prefix so "5月にニューヨーク" → "ニューヨーク"
+    const originFrag = viaMatch[1].replace(/^\d{1,2}月(?:\d{1,2}日)?[にへで]?/, '').trim()
+    const origin = resolveCity(originFrag) ?? resolveCity(viaMatch[1])
     const via    = resolveCity(viaMatch[2])
     const dest   = resolveCity(viaMatch[3])
     if (origin && via && dest) {
@@ -144,12 +147,19 @@ function tryParseMultiCity(query: string): MultiCityParsedQuery | null {
       const daysMatch = query.match(/(\d+)日間/)
       const totalDays = daysMatch ? parseInt(daysMatch[1]) : null
 
-      // Detect explicit return leg: "12月28日に東京へ戻る" / "12月28日 東京に戻る"
+      // Explicit return leg with a date: "12月28日に東京へ戻る/帰る"
       const returnLegM = query.match(
-        /[、，,].*?(\d{1,2}月\d{1,2}日|\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2}).*?(?:に)?(.{1,15}?)(?:へ|に)(?:戻る|もどる)/
+        /[、，,].*?(\d{1,2}月\d{1,2}日|\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2}).*?(?:に)?(.{1,15}?)(?:へ|に)(?:戻る|もどる|帰る)/
       )
       const returnDate = returnLegM ? parseDate(returnLegM[1]) : null
       const returnCity = (returnLegM ? resolveCity(returnLegM[2]) : null) ?? origin
+
+      // Casual return without a date: "そのまま東京へ帰る", "，東京へ帰る"
+      const casualReturnM = !returnDate
+        ? (query.match(/(?:そのまま|最後[はに]|そして)([^\d、，,。\s]{1,10}?)(?:へ|に)(?:帰る|帰国|戻る|もどる)/)
+           ?? query.match(/[、，,。]\s*([^\d、，,。\s]{1,10}?)(?:へ|に)(?:帰る|帰国|戻る|もどる)/))
+        : null
+      const casualReturnCity = casualReturnM ? resolveCity(casualReturnM[1]) : null
 
       const segments: MultiCitySegmentQuery[] = [
         { origin, destination: via, date: baseDate },
@@ -159,6 +169,8 @@ function tryParseMultiCity(query: string): MultiCityParsedQuery | null {
         segments.push({ origin: dest, destination: returnCity, date: returnDate })
       } else if (totalDays) {
         segments.push({ origin: dest, destination: origin, date: addDays(baseDate, totalDays) })
+      } else if (casualReturnCity) {
+        segments.push({ origin: dest, destination: casualReturnCity, date: addDays(baseDate, 6) })
       }
       return { type: 'multi-city', segments, passengers, cabinClass }
     }
