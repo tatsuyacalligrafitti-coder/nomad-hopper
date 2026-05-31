@@ -112,6 +112,11 @@ function Page3() {
         日程・行き先が決まってなくてもOK。<br />
         話しかけるように入力してみてください。
       </p>
+      <hr className="border-gray-100 my-3" />
+      <p className="text-sm text-gray-500 text-center">もちろん具体的な検索もOK</p>
+      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-indigo-800 leading-relaxed">
+        💬 東京からバンコクへ 12月25日 1名
+      </div>
     </div>
   )
 }
@@ -152,7 +157,6 @@ function Page5({ onClose }: { onClose: () => void }) {
     { icon: '🗺️', text: '地図で旅程を視覚化' },
     { icon: '📅', text: '滞在日数スライダー' },
     { icon: '🔄', text: 'AIによる最適ルート自動提案' },
-    { icon: '🌏', text: 'ビザ要件・乗り継ぎ時間チェック' },
   ]
 
   return (
@@ -166,6 +170,10 @@ function Page5({ onClose }: { onClose: () => void }) {
           </li>
         ))}
       </ul>
+      <p className="text-sm text-indigo-600 text-center mt-3">
+        🧸 いつか、世界がみんなの遊び場になるような<br />
+        ワクワクするアプリに育てていきます。
+      </p>
 
       <hr className="border-gray-200" />
 
