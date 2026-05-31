@@ -501,12 +501,6 @@ export default function HomePage() {
           <span className="text-xs text-gray-400 hidden sm:block">
             世界への扉を、あなたの手に。
           </span>
-          <button
-            onClick={() => setShowOnboarding(true)}
-            className="hidden md:flex items-center gap-1 text-sm text-gray-500 hover:text-indigo-600 transition-colors px-3 py-1 rounded-lg hover:bg-indigo-50 ml-auto"
-          >
-            📖 使い方
-          </button>
         </div>
       </header>
 

@@ -367,10 +367,10 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
         </div>
       )}
 
-      {/* Help button — mobile only */}
+      {/* Help button — all devices */}
       <button
         onClick={openHelp}
-        className="md:hidden fixed bottom-4 left-4 bg-white border border-gray-200 rounded-full w-10 h-10 shadow-md flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:border-indigo-300 transition-colors z-40"
+        className="fixed bottom-6 left-6 bg-white border-2 border-indigo-200 rounded-full w-11 h-11 shadow-md flex items-center justify-center text-indigo-400 hover:text-indigo-600 hover:border-indigo-400 hover:shadow-lg transition-all z-40 text-lg"
         aria-label="使い方を見る"
       >
         ？
