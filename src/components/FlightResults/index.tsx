@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { Plane, Clock, Zap } from 'lucide-react'
 import type { CategorizedFlights, FlightResult, SearchQuery } from '@/types'
-import ExternalLinks from '@/components/ExternalLinks'
 import AlertModal from '@/components/AlertModal'
 
 interface Props {
@@ -277,16 +276,7 @@ export default function FlightResults({ categorized, isLoading, error, query, mo
 
   return (
     <div className="space-y-6">
-      {hasQuery && (
-        <ExternalLinks
-          origin={query!.origin}
-          destination={query!.destination}
-          departureDate={query!.departureDate}
-          returnDate={query!.returnDate}
-        />
-      )}
-
-      {isLoading ? (
+{isLoading ? (
         <>
           {loadingMessage && (
             <p className="text-center text-amber-600 font-semibold text-sm py-2">
