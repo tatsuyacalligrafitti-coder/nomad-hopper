@@ -30,6 +30,25 @@ function googleFlightsUrl(origin: string, destination: string): string {
   return `https://www.google.com/travel/flights?q=flights+${origin}+to+${destination}`
 }
 
+// post_data は "u=<encoded_string>" 形式の単一パラメータ。
+// URLSearchParams で展開して hidden input に変換し、新しいタブへ POST 送信する。
+function submitBookingPost(bookingUrl: string, bookingPostData: string): void {
+  const form = document.createElement('form')
+  form.method = 'POST'
+  form.action = bookingUrl
+  form.target = '_blank'
+  for (const [key, value] of new URLSearchParams(bookingPostData).entries()) {
+    const input = document.createElement('input')
+    input.type = 'hidden'
+    input.name = key
+    input.value = value
+    form.appendChild(input)
+  }
+  document.body.appendChild(form)
+  form.submit()
+  document.body.removeChild(form)
+}
+
 export default function BookingOptionsPanel({ flight, query, onClose }: Props) {
   const [options, setOptions] = useState<BookingOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -136,8 +155,14 @@ export default function BookingOptionsPanel({ flight, query, onClose }: Props) {
                     ¥{opt.price.toLocaleString()}
                   </span>
                 )}
-                {opt.bookingUrl ? (
-                  // TODO(step4): POST送信に差し替え (bookingPostData を使う)
+                {opt.bookingUrl && opt.bookingPostData ? (
+                  <button
+                    onClick={() => submitBookingPost(opt.bookingUrl!, opt.bookingPostData!)}
+                    className="bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg px-4 py-2 text-xs transition-colors whitespace-nowrap"
+                  >
+                    予約する →
+                  </button>
+                ) : opt.bookingUrl ? (
                   <a
                     href={opt.bookingUrl}
                     target="_blank"
