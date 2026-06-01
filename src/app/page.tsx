@@ -19,6 +19,15 @@ interface ExploreParams {
   rawQuery: string
 }
 
+function aviasalesUrl(origin: string, destination: string, departureDate: string, returnDate?: string | null): string {
+  const toddmm = (iso: string) => {
+    const [, m, d] = iso.split('-')
+    return `${d}${m}`
+  }
+  const base = `https://www.aviasales.com/search/${origin}${toddmm(departureDate)}${destination}1`
+  return returnDate ? `${base}${toddmm(returnDate)}?marker=731864` : `${base}?marker=731864`
+}
+
 const MODE_HINTS: Record<SearchMode, string> = {
   price:   'お得な最安値の航空券を探します',
   balance: '価格と快適さのバランスで探します',
@@ -622,6 +631,29 @@ export default function HomePage() {
               })
             }}
           />
+        )}
+
+        {/* Aviasales fallback link */}
+        {searched && !isLoading && !elegantLoading && lastQuery && (
+          categorized && (
+            categorized.cheapest.length > 0 ||
+            categorized.cheapestDirect.length > 0 ||
+            categorized.recommended.length > 0
+          )
+        ) && (
+          <div>
+            <a
+              href={aviasalesUrl(lastQuery.origin, lastQuery.destination, lastQuery.departureDate, lastQuery.returnDate)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-purple-400 text-purple-600 hover:bg-purple-50 font-semibold text-sm transition-colors"
+            >
+              🌍 海外予約サイトで、もっと安いLCC便も探す
+            </a>
+            <p className="text-xs text-gray-400 text-center mt-2">
+              ※ 海外の予約サイト（Aviasales）へ移動します。LCCや別空港の便が見つかることがありますが、価格は米ドル表示・変動する場合があり、予約手続きは英語です。
+            </p>
+          </div>
         )}
 
       </main>
