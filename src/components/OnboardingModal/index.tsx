@@ -6,9 +6,9 @@ import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 const STORAGE_KEY = 'tobira_onboarding_shown'
 const LATEST_UPDATE_VERSION = '2026-06-02'
 const UPDATE_STORAGE_KEY = 'tobira_update_seen'
-const TOTAL_PAGES = 6
+const TOTAL_PAGES = 7
 
-type ModalMode = 'onboarding' | 'update' | null
+type OpenReason = 'initial' | 'update' | 'help' | null
 
 function safeGetStorage(key: string): string | null {
   try {
@@ -26,37 +26,7 @@ function safeSetStorage(key: string, value: string): void {
   } catch {}
 }
 
-// ─── Update page ───────────────────────────────────────────────────────────────
-function UpdatePage() {
-  const updates = [
-    '国内線（JAL・ANA・スカイマーク・ソラシドエア等）に対応',
-    '予約先を一覧で比較できる「予約先パネル」を追加',
-    '航空会社公式サイトの予約ページへ直接ジャンプ',
-    '「来週」など曖昧な日付はAIが相談モードで日程を確認',
-  ]
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-bold text-gray-900">🎉 アップデート情報</h2>
-        <p className="text-xs text-gray-400 mt-1">2026年6月2日</p>
-      </div>
-      <ul className="space-y-3">
-        {updates.map((item) => (
-          <li key={item} className="flex items-start gap-2 text-sm text-gray-700">
-            <span className="shrink-0 text-green-500">✅</span>
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="text-xs text-indigo-500 text-center pt-2">
-        今後もアップデートを続けていきます
-      </p>
-    </div>
-  )
-}
-
-// ─── Onboarding pages ──────────────────────────────────────────────────────────
+// ─── Pages ─────────────────────────────────────────────────────────────────────
 function Page1() {
   return (
     <div className="space-y-5">
@@ -241,7 +211,8 @@ function Page5() {
   )
 }
 
-function Page6({ onClose }: { onClose: () => void }) {
+// Page6 is no longer the final page — CTA button removed, navigation footer handles progression
+function Page6() {
   const roadmap = [
     { icon: '✈️', text: '陸マイラーサポート機能' },
     { icon: '🗺️', text: '地図で旅程を視覚化' },
@@ -274,6 +245,35 @@ function Page6({ onClose }: { onClose: () => void }) {
           「こんな機能があれば使う」など何でも歓迎です。
         </p>
       </div>
+    </div>
+  )
+}
+
+function Page7({ onClose }: { onClose: () => void }) {
+  const updates = [
+    '国内線（JAL・ANA・スカイマーク・ソラシドエア等）に対応',
+    '予約先を一覧で比較できる「予約先パネル」を追加',
+    '航空会社公式サイトの予約ページへ直接ジャンプ',
+    '「来週」など曖昧な日付はAIが相談モードで日程を確認',
+  ]
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">🎉 アップデート情報</h2>
+        <p className="text-xs text-gray-400 mt-1">2026年6月2日</p>
+      </div>
+      <ul className="space-y-3">
+        {updates.map((item) => (
+          <li key={item} className="flex items-start gap-2 text-sm text-gray-700">
+            <span className="shrink-0 text-green-500">✅</span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-indigo-500 text-center pt-1">
+        今後もアップデートを続けていきます
+      </p>
 
       <button
         onClick={onClose}
@@ -292,9 +292,9 @@ interface Props {
 }
 
 export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
-  const [mode, setMode] = useState<ModalMode>(null)
+  const [isOpen, setIsOpen] = useState(false)
   const [page, setPage] = useState(0)
-  const [fromHelp, setFromHelp] = useState(false)
+  const [openReason, setOpenReason] = useState<OpenReason>(null)
 
   // Determine initial display on mount
   useEffect(() => {
@@ -302,41 +302,45 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
     const updateSeen = safeGetStorage(UPDATE_STORAGE_KEY) === LATEST_UPDATE_VERSION
 
     if (!onboardingSeen) {
-      setMode('onboarding')
+      setPage(0)
+      setOpenReason('initial')
+      setIsOpen(true)
     } else if (!updateSeen) {
-      setMode('update')
+      setPage(TOTAL_PAGES - 1) // Jump straight to the update page
+      setOpenReason('update')
+      setIsOpen(true)
     }
   }, [])
 
-  // forcedOpen: show onboarding from the start
+  // forcedOpen: show from page 1 (same as "?" help)
   useEffect(() => {
     if (forcedOpen) {
       setPage(0)
-      setMode('onboarding')
+      setOpenReason('help')
+      setIsOpen(true)
     }
   }, [forcedOpen])
 
-  const isVisible = mode !== null || !!forcedOpen
+  const isVisible = isOpen || !!forcedOpen
 
   const close = () => {
-    if (mode === 'onboarding') {
-      // New user completing onboarding: mark both as seen
+    if (openReason === 'initial') {
       safeSetStorage(STORAGE_KEY, 'true')
       safeSetStorage(UPDATE_STORAGE_KEY, LATEST_UPDATE_VERSION)
-    } else if (mode === 'update' && !fromHelp) {
-      // Existing user dismissing the auto-shown update page: mark as seen
+    } else if (openReason === 'update') {
       safeSetStorage(UPDATE_STORAGE_KEY, LATEST_UPDATE_VERSION)
     }
-    // fromHelp: don't write anything — show again next time
-    setMode(null)
+    // 'help': no localStorage writes
+    setIsOpen(false)
     setPage(0)
-    setFromHelp(false)
+    setOpenReason(null)
     onForcedClose?.()
   }
 
   const openHelp = () => {
-    setFromHelp(true)
-    setMode('update')
+    setPage(0)
+    setOpenReason('help')
+    setIsOpen(true)
   }
 
   return (
@@ -351,7 +355,7 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
             {/* Top bar */}
             <div className="flex items-center justify-between px-5 pt-4 pb-2 shrink-0">
               <span className="text-xs text-gray-400 font-medium">
-                {mode === 'onboarding' ? `${page + 1} / ${TOTAL_PAGES}` : '最新情報'}
+                {page + 1} / {TOTAL_PAGES}
               </span>
               <button
                 onClick={close}
@@ -362,20 +366,21 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
               </button>
             </div>
 
-            {/* Page content */}
+            {/* Page content — fixed min-height so modal size stays stable */}
             <div className="flex-1 overflow-y-auto px-6 py-3 min-h-0 min-h-[420px]">
-              {mode === 'update' && <UpdatePage />}
-              {mode === 'onboarding' && page === 0 && <Page1 />}
-              {mode === 'onboarding' && page === 1 && <Page2 />}
-              {mode === 'onboarding' && page === 2 && <Page3 />}
-              {mode === 'onboarding' && page === 3 && <Page4 />}
-              {mode === 'onboarding' && page === 4 && <Page5 />}
-              {mode === 'onboarding' && page === 5 && <Page6 onClose={close} />}
+              {page === 0 && <Page1 />}
+              {page === 1 && <Page2 />}
+              {page === 2 && <Page3 />}
+              {page === 3 && <Page4 />}
+              {page === 4 && <Page5 />}
+              {page === 5 && <Page6 />}
+              {page === 6 && <Page7 onClose={close} />}
             </div>
 
-            {/* Navigation footer — onboarding mode only, not on last page */}
-            {mode === 'onboarding' && page < TOTAL_PAGES - 1 && (
+            {/* Navigation footer — shown for all pages except the last */}
+            {page < TOTAL_PAGES - 1 && (
               <div className="px-6 pb-5 pt-3 shrink-0 space-y-4">
+                {/* Dots */}
                 <div className="flex justify-center gap-1.5">
                   {Array.from({ length: TOTAL_PAGES }).map((_, i) => (
                     <button
@@ -391,6 +396,7 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
                   ))}
                 </div>
 
+                {/* Prev / Next */}
                 <div className="flex gap-2">
                   {page > 0 ? (
                     <button
@@ -414,9 +420,9 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
               </div>
             )}
 
-            {/* Dots on last onboarding page (no nav — Page6 has its own CTA) */}
-            {mode === 'onboarding' && page === TOTAL_PAGES - 1 && (
-              <div className="flex justify-center gap-1.5 pb-5 pt-2 shrink-0">
+            {/* Dots only on last page — Page7 has its own CTA button */}
+            {page === TOTAL_PAGES - 1 && (
+              <div className="flex justify-center gap-1.5 pb-3 pt-2 shrink-0">
                 {Array.from({ length: TOTAL_PAGES }).map((_, i) => (
                   <button
                     key={i}
@@ -429,18 +435,6 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
                     aria-label={`${i + 1}ページ目`}
                   />
                 ))}
-              </div>
-            )}
-
-            {/* Close button for update mode */}
-            {mode === 'update' && (
-              <div className="px-6 pb-5 pt-3 shrink-0">
-                <button
-                  onClick={close}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl py-3 text-sm transition-colors"
-                >
-                  閉じる
-                </button>
               </div>
             )}
           </div>
