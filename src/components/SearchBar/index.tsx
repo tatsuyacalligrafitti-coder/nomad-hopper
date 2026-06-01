@@ -57,6 +57,8 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
   const [placeholder, setPlaceholder] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Track which rawQuery was last parsed to detect stale state
+  const lastParsedRawRef = useRef<string>('')
 
   // Typewriter placeholder animation — stops while user is typing
   useEffect(() => {
@@ -99,7 +101,7 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
 
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
-    setQuery: (q: string) => { setRawQuery(q); setParsed(null) },
+    setQuery: (q: string) => { setRawQuery(q); setParsed(null); lastParsedRawRef.current = '' },
   }))
 
   useEffect(() => {
@@ -118,6 +120,7 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
           body: JSON.stringify({ query: rawQuery }),
         })
         const data = await res.json()
+        lastParsedRawRef.current = rawQuery
         setParsed(data)
       } finally {
         setIsParsing(false)
@@ -131,8 +134,10 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
 
     let p: ParsedQuery | MultiCityParsedQuery | null = parsed
 
-    // Fetch from API if not yet parsed or fields are missing
-    if (!p || (!isMultiCity(p) && (!p.origin || !p.destination || !p.departureDate))) {
+    // Fetch from API if: not yet parsed, fields are missing, OR rawQuery changed since last parse
+    // (prevents stale parsed state from a previous query being used — e.g. FSZ origin bug)
+    const queryChanged = lastParsedRawRef.current !== rawQuery
+    if (!p || queryChanged || (!isMultiCity(p) && (!p.origin || !p.destination || !p.departureDate))) {
       setIsParsing(true)
       try {
         const res = await fetch('/api/parse-query', {
