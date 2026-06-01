@@ -38,6 +38,13 @@ function isMultiCity(p: ParsedQuery | MultiCityParsedQuery | null): p is MultiCi
   return p !== null && (p as MultiCityParsedQuery).type === 'multi-city'
 }
 
+// 曖昧な日付表現を含み、具体的な日付（数字+月/日）がない場合にtrue
+function hasAmbiguousDate(query: string): boolean {
+  const ambiguous = /来週|今週末|今週|週末|近いうち|そのうち|いつか/
+  const specificDate = /\d+\s*[月日]/
+  return ambiguous.test(query) && !specificDate.test(query)
+}
+
 const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
   { onSearch, onMultiCitySearch, onExplore, isLoading },
   ref,
@@ -160,6 +167,12 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
         else if (!sq?.destination) setError('目的地を認識できませんでした（例: バンコクへ、BKK）')
         else                    setError('日程を認識できませんでした（例: 12月25日、来週）')
       }
+      return
+    }
+
+    // 出発地・目的地が確定しているが日付が曖昧な場合 → 旅の相談モードへ
+    if (hasAmbiguousDate(rawQuery) && onExplore) {
+      onExplore({ origin: sq.origin, destination: sq.destination, rawQuery })
       return
     }
 
