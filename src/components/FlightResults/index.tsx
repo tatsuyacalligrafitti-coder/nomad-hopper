@@ -41,7 +41,7 @@ function formatDepDate(iso: string): string {
 }
 
 // ─── Flight card ───────────────────────────────────────────────────────────────
-function TpCard({ flight, badge, showBusinessBadge }: { flight: FlightResult; badge?: string; showBusinessBadge?: boolean }) {
+function TpCard({ flight, badge, showBusinessBadge, isOneWay }: { flight: FlightResult; badge?: string; showBusinessBadge?: boolean; isOneWay?: boolean }) {
   const [alertOpen, setAlertOpen] = useState(false)
   const seg = flight.segments[0]
   const hasAirline = !!seg.carrierCode
@@ -101,13 +101,17 @@ function TpCard({ flight, badge, showBusinessBadge }: { flight: FlightResult; ba
 
         <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t border-gray-100 pt-3 sm:border-0 sm:pt-0">
           <div>
-            <p className="text-xs text-gray-400 leading-none mb-1">往復合計</p>
+            <p className="text-xs text-gray-400 leading-none mb-1">
+              {isOneWay ? '片道' : '往復合計'}
+            </p>
             <p className="text-2xl font-bold text-indigo-700 tabular-nums leading-none">
               ¥{Math.round(flight.totalPrice).toLocaleString()}
             </p>
-            <p className="text-xs text-gray-400 mt-1">
-              片道目安 ¥{Math.round(flight.totalPrice / 2).toLocaleString()}〜
-            </p>
+            {!isOneWay && (
+              <p className="text-xs text-gray-400 mt-1">
+                片道目安 ¥{Math.round(flight.totalPrice / 2).toLocaleString()}〜
+              </p>
+            )}
             <div className="flex items-center gap-2 mt-1.5 text-xs flex-wrap">
               {flight.stops === 0 ? (
                 <span className="flex items-center gap-0.5 text-blue-600 font-semibold">
@@ -189,10 +193,12 @@ function CategorySection({
   config,
   flights,
   isElegant,
+  isOneWay,
 }: {
   config: CategoryConfig
   flights: FlightResult[]
   isElegant?: boolean
+  isOneWay?: boolean
 }) {
   const sorted = isElegant
     ? [...flights].sort((a, b) => a.totalPrice - b.totalPrice)
@@ -215,6 +221,7 @@ function CategorySection({
             flight={flight}
             badge={i === 0 ? config.badge : undefined}
             showBusinessBadge={isElegant}
+            isOneWay={isOneWay}
           />
         ))
       )}
@@ -302,6 +309,7 @@ export default function FlightResults({ categorized, isLoading, error, query, mo
               config={cfg}
               flights={categorized![cfg.key]}
               isElegant={mode === 'elegant'}
+              isOneWay={!query?.returnDate}
             />
           ))}
         </>
