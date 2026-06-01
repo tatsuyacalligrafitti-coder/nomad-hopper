@@ -554,31 +554,6 @@ export default function HomePage() {
           />
         )}
 
-        {/* AI Analysis */}
-        {searched && !isLoading && !elegantLoading && categorized && lastQuery && (
-          categorized.cheapest.length > 0 ||
-          categorized.cheapestDirect.length > 0 ||
-          categorized.recommended.length > 0
-        ) && (
-          <AIAnalysis
-            categorized={categorized}
-            query={lastQuery}
-            onReSearch={(q) => {
-              const raw = `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`
-              searchBarRef.current?.setQuery(raw)
-              handleSearch({
-                origin: q.origin,
-                destination: q.destination,
-                departureDate: q.departureDate,
-                returnDate: q.returnDate,
-                passengers: lastQuery.passengers,
-                cabinClass: lastQuery.cabinClass,
-                rawQuery: raw,
-              })
-            }}
-          />
-        )}
-
         {/* Multi-city results */}
         {(isMultiCityLoading || multiCityResult || multiCityError) && (
           <MultiCityResults
@@ -621,6 +596,31 @@ export default function HomePage() {
             query={lastQuery}
             mode={mode}
             loadingMessage={elegantLoading || (isLoading && mode === 'elegant') ? 'ビジネスクラスを検索中...' : undefined}
+          />
+        )}
+
+        {/* AI Analysis */}
+        {searched && !isLoading && !elegantLoading && categorized && lastQuery && (
+          categorized.cheapest.length > 0 ||
+          categorized.cheapestDirect.length > 0 ||
+          categorized.recommended.length > 0
+        ) && (
+          <AIAnalysis
+            categorized={categorized}
+            query={lastQuery}
+            onReSearch={(q) => {
+              const raw = `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`
+              searchBarRef.current?.setQuery(raw)
+              handleSearch({
+                origin: q.origin,
+                destination: q.destination,
+                departureDate: q.departureDate,
+                returnDate: q.returnDate,
+                passengers: lastQuery.passengers,
+                cabinClass: lastQuery.cabinClass,
+                rawQuery: raw,
+              })
+            }}
           />
         )}
 
