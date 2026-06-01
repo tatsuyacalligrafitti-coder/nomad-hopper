@@ -53,9 +53,9 @@ function groupToFlightResult(
     destinationName: f.arrival_airport.name,
     departingAt: serpTimeToISO(f.departure_airport.time),
     arrivingAt: serpTimeToISO(f.arrival_airport.time),
-    carrierCode: f.flight_number.slice(0, 2),
+    carrierCode: f.flight_number.split(' ')[0] ?? '',  // "JL 501" → "JL"
     carrierName: f.airline,
-    flightNumber: f.flight_number,
+    flightNumber: f.flight_number.replace(/\s+/g, ''), // "JL 501" → "JL501"
     duration: f.duration,
     stops: 0,
   }))
@@ -135,8 +135,8 @@ export class SerpAPIProvider implements FlightProvider {
         origin: query.origin,
         destination: query.destination,
         departureDate: first?.departure_airport.time.split(' ')[0] ?? query.departureDate,
-        airline: first?.flight_number.slice(0, 2) ?? '',
-        flightNumber: first?.flight_number ?? '',
+        airline: first?.flight_number.split(' ')[0] ?? '',     // "JL 501" → "JL"
+        flightNumber: first?.flight_number.replace(/\s+/g, '') ?? '', // "JL 501" → "JL501"
         price: group.price,
         currency: 'JPY',
         durationMinutes: group.total_duration,

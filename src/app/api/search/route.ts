@@ -14,19 +14,30 @@ function balanceScore(
   return priceFactor * 0.5 + durFactor * 0.3 + stopsPenalty
 }
 
+// 航空会社ごとの最安1件を抽出してから価格順に並べる（多様性保証）
+function cheapestPerAirline(flights: FlightResult[], limit: number): FlightResult[] {
+  const sorted = [...flights].sort((a, b) => a.totalPrice - b.totalPrice)
+  const seen = new Map<string, FlightResult>()
+  for (const f of sorted) {
+    const carrier = f.segments[0]?.carrierCode || f.segments[0]?.carrierName || 'unknown'
+    if (!seen.has(carrier)) seen.set(carrier, f)
+  }
+  return [...seen.values()]
+    .sort((a, b) => a.totalPrice - b.totalPrice)
+    .slice(0, limit)
+}
+
 function categorize(flights: FlightResult[]): CategorizedFlights {
   if (flights.length === 0) {
     return { cheapest: [], cheapestDirect: [], recommended: [] }
   }
 
-  const byPrice = [...flights].sort((a, b) => a.totalPrice - b.totalPrice)
-  const cheapest = byPrice.slice(0, 3)
+  const cheapest = cheapestPerAirline(flights, 5)
 
   const directOnly = flights.filter((f) => f.stops === 0)
-  const cheapestDirect = [...directOnly]
-    .sort((a, b) => a.totalPrice - b.totalPrice)
-    .slice(0, 3)
+  const cheapestDirect = cheapestPerAirline(directOnly, 5)
 
+  const byPrice = [...flights].sort((a, b) => a.totalPrice - b.totalPrice)
   const minPrice = byPrice[0].totalPrice
   const durations = flights.filter((f) => f.totalDuration > 0).map((f) => f.totalDuration)
   const minDuration = durations.length > 0 ? Math.min(...durations) : 1
@@ -37,7 +48,7 @@ function categorize(flights: FlightResult[]): CategorizedFlights {
         balanceScore(a, minPrice, minDuration) -
         balanceScore(b, minPrice, minDuration),
     )
-    .slice(0, 3)
+    .slice(0, 5)
 
   return { cheapest, cheapestDirect, recommended }
 }
