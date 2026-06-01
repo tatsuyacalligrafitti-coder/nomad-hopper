@@ -170,28 +170,23 @@ export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
   return (
     <div className="space-y-3">
       {!result && (
-        <div className="flex items-center gap-3">
-          <button
-            onClick={analyze}
-            disabled={loading}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold text-sm transition-colors disabled:opacity-60 shadow-sm"
-          >
-            {loading ? (
-              <>
-                <Loader2 size={15} className="animate-spin" />
-                AI分析中...
-              </>
-            ) : (
-              <>
-                <Sparkles size={15} />
-                AI分析
-              </>
-            )}
-          </button>
-          {!loading && (
-            <span className="text-xs text-gray-400">価格が今お得かどうかをAIが判断します</span>
+        <button
+          onClick={analyze}
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:from-purple-800 active:to-indigo-800 text-white font-bold text-base transition-all disabled:opacity-60 shadow-md"
+        >
+          {loading ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              AI分析中...
+            </>
+          ) : (
+            <>
+              <Sparkles size={18} />
+              ✨ この旅程をAIが分析する
+            </>
           )}
-        </div>
+        </button>
       )}
 
       {error && (

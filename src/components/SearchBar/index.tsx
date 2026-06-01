@@ -38,6 +38,14 @@ function isMultiCity(p: ParsedQuery | MultiCityParsedQuery | null): p is MultiCi
   return p !== null && (p as MultiCityParsedQuery).type === 'multi-city'
 }
 
+// 曖昧な日付表現を含み、具体的な日付（数字+月/日）がない場合にtrue
+function hasAmbiguousDate(query: string): boolean {
+  const ambiguous = /来週|今週末|今週|週末|近いうち|そのうち|いつか/
+  const specificDate = /\d+\s*[月日]/
+  const weekday = /月曜日?|火曜日?|水曜日?|木曜日?|金曜日?|土曜日?|日曜日?/
+  return ambiguous.test(query) && !specificDate.test(query) && !weekday.test(query)
+}
+
 const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
   { onSearch, onMultiCitySearch, onExplore, isLoading },
   ref,
@@ -49,6 +57,8 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
   const [placeholder, setPlaceholder] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Track which rawQuery was last parsed to detect stale state
+  const lastParsedRawRef = useRef<string>('')
 
   // Typewriter placeholder animation — stops while user is typing
   useEffect(() => {
@@ -91,7 +101,7 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
 
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
-    setQuery: (q: string) => { setRawQuery(q); setParsed(null) },
+    setQuery: (q: string) => { setRawQuery(q); setParsed(null); lastParsedRawRef.current = '' },
   }))
 
   useEffect(() => {
@@ -110,6 +120,7 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
           body: JSON.stringify({ query: rawQuery }),
         })
         const data = await res.json()
+        lastParsedRawRef.current = rawQuery
         setParsed(data)
       } finally {
         setIsParsing(false)
@@ -123,8 +134,10 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
 
     let p: ParsedQuery | MultiCityParsedQuery | null = parsed
 
-    // Fetch from API if not yet parsed or fields are missing
-    if (!p || (!isMultiCity(p) && (!p.origin || !p.destination || !p.departureDate))) {
+    // Fetch from API if: not yet parsed, fields are missing, OR rawQuery changed since last parse
+    // (prevents stale parsed state from a previous query being used — e.g. FSZ origin bug)
+    const queryChanged = lastParsedRawRef.current !== rawQuery
+    if (!p || queryChanged || (!isMultiCity(p) && (!p.origin || !p.destination || !p.departureDate))) {
       setIsParsing(true)
       try {
         const res = await fetch('/api/parse-query', {
@@ -160,6 +173,12 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
         else if (!sq?.destination) setError('目的地を認識できませんでした（例: バンコクへ、BKK）')
         else                    setError('日程を認識できませんでした（例: 12月25日、来週）')
       }
+      return
+    }
+
+    // 出発地・目的地が確定しているが日付が曖昧な場合 → 旅の相談モードへ
+    if (hasAmbiguousDate(rawQuery) && onExplore) {
+      onExplore({ origin: sq.origin, destination: sq.destination, rawQuery })
       return
     }
 
