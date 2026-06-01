@@ -144,7 +144,7 @@ function TpCard({ flight, badge, showBusinessBadge, isOneWay, query }: { flight:
               onClick={() => setPanelOpen((p) => !p)}
               className="bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl px-6 py-3 transition-colors whitespace-nowrap text-sm shrink-0"
             >
-              {panelOpen ? '閉じる ✕' : '今すぐ予約 →'}
+              {panelOpen ? '閉じる ✕' : '予約先を見る'}
             </button>
           ) : (
             <a

@@ -95,7 +95,7 @@ export default function BookingOptionsPanel({ flight, query, onClose }: Props) {
 
   return (
     <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 mt-1">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-1">
         <p className="font-semibold text-gray-700 text-sm">予約先を選択</p>
         <button
           onClick={onClose}
@@ -105,6 +105,9 @@ export default function BookingOptionsPanel({ flight, query, onClose }: Props) {
           <X size={16} />
         </button>
       </div>
+      <p className="text-xs text-gray-400 mt-1 mb-2">
+        ※ 最新の空席状況に基づく価格です。検索時の表示と差が出ることがあります。
+      </p>
 
       {loading ? (
         <div className="flex items-center justify-center gap-2 py-4 text-sm text-gray-500">
