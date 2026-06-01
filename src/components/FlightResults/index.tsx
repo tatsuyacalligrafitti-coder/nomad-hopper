@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Plane, Clock, Zap } from 'lucide-react'
 import type { CategorizedFlights, FlightResult, SearchQuery } from '@/types'
 import AlertModal from '@/components/AlertModal'
+import BookingOptionsPanel from '@/components/BookingOptionsPanel'
 
 interface Props {
   categorized: CategorizedFlights | null
@@ -41,8 +42,10 @@ function formatDepDate(iso: string): string {
 }
 
 // ─── Flight card ───────────────────────────────────────────────────────────────
-function TpCard({ flight, badge, showBusinessBadge, isOneWay }: { flight: FlightResult; badge?: string; showBusinessBadge?: boolean; isOneWay?: boolean }) {
+function TpCard({ flight, badge, showBusinessBadge, isOneWay, query }: { flight: FlightResult; badge?: string; showBusinessBadge?: boolean; isOneWay?: boolean; query?: SearchQuery | null }) {
   const [alertOpen, setAlertOpen] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false)
+  const hasTokens = !!(flight.serpBookingToken || flight.serpDepartureToken)
   const seg = flight.segments[0]
   const hasAirline = !!seg.carrierCode
   const airlineName = hasAirline
@@ -136,17 +139,38 @@ function TpCard({ flight, badge, showBusinessBadge, isOneWay }: { flight: Flight
             </button>
           </div>
 
-          <a
-            href={flight.bookingLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl px-6 py-3 transition-colors whitespace-nowrap text-sm shrink-0"
-          >
-            今すぐ予約 →
-          </a>
+          {hasTokens ? (
+            <button
+              onClick={() => setPanelOpen((p) => !p)}
+              className="bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl px-6 py-3 transition-colors whitespace-nowrap text-sm shrink-0"
+            >
+              {panelOpen ? '閉じる ✕' : '今すぐ予約 →'}
+            </button>
+          ) : (
+            <a
+              href={flight.bookingLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl px-6 py-3 transition-colors whitespace-nowrap text-sm shrink-0"
+            >
+              今すぐ予約 →
+            </a>
+          )}
         </div>
       </div>
 
+      {panelOpen && hasTokens && query && (
+        <BookingOptionsPanel
+          flight={flight}
+          query={{
+            origin: query.origin,
+            destination: query.destination,
+            outboundDate: query.departureDate,
+            returnDate: query.returnDate,
+          }}
+          onClose={() => setPanelOpen(false)}
+        />
+      )}
       {alertOpen && <AlertModal flight={flight} onClose={() => setAlertOpen(false)} />}
     </>
   )
@@ -194,11 +218,13 @@ function CategorySection({
   flights,
   isElegant,
   isOneWay,
+  query,
 }: {
   config: CategoryConfig
   flights: FlightResult[]
   isElegant?: boolean
   isOneWay?: boolean
+  query?: SearchQuery | null
 }) {
   const sorted = isElegant
     ? [...flights].sort((a, b) => a.totalPrice - b.totalPrice)
@@ -222,6 +248,7 @@ function CategorySection({
             badge={i === 0 ? config.badge : undefined}
             showBusinessBadge={isElegant}
             isOneWay={isOneWay}
+            query={query}
           />
         ))
       )}
@@ -310,6 +337,7 @@ export default function FlightResults({ categorized, isLoading, error, query, mo
               flights={categorized![cfg.key]}
               isElegant={mode === 'elegant'}
               isOneWay={!query?.returnDate}
+              query={query}
             />
           ))}
         </>
