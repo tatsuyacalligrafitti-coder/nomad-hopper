@@ -42,7 +42,8 @@ function isMultiCity(p: ParsedQuery | MultiCityParsedQuery | null): p is MultiCi
 function hasAmbiguousDate(query: string): boolean {
   const ambiguous = /来週|今週末|今週|週末|近いうち|そのうち|いつか/
   const specificDate = /\d+\s*[月日]/
-  return ambiguous.test(query) && !specificDate.test(query)
+  const weekday = /月曜日?|火曜日?|水曜日?|木曜日?|金曜日?|土曜日?|日曜日?/
+  return ambiguous.test(query) && !specificDate.test(query) && !weekday.test(query)
 }
 
 const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
