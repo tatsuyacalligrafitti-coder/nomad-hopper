@@ -15,12 +15,6 @@ function toYYMMDD(iso: string): string {
   return `${year.slice(2)}${month}${day}`
 }
 
-function googleFlightsUrl(p: Props): string {
-  const base = 'https://www.google.com/travel/flights'
-  const q = [p.origin, p.destination, p.departureDate].join('+')
-  return `${base}?q=${q}`
-}
-
 function skyscannerUrl(p: Props): string {
   const dep = toYYMMDD(p.departureDate)
   const ret = p.returnDate ? toYYMMDD(p.returnDate) : ''
@@ -45,14 +39,6 @@ function jetstarUrl(p: Props): string {
 }
 
 const SERVICES = [
-  {
-    id: 'google',
-    name: 'Google Flights',
-    emoji: '🔍',
-    description: '最安値を横断比較',
-    color: 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100',
-    getUrl: googleFlightsUrl,
-  },
   {
     id: 'skyscanner',
     name: 'Skyscanner',
@@ -83,7 +69,7 @@ export default function ExternalLinks(props: Props) {
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {SERVICES.map((svc) => (
           <a
             key={svc.id}
