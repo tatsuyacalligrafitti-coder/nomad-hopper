@@ -25,7 +25,9 @@ function aviasalesUrl(origin: string, destination: string, departureDate: string
     return `${d}${m}`
   }
   const base = `https://www.aviasales.com/search/${origin}${toddmm(departureDate)}${destination}1`
-  return returnDate ? `${base}${toddmm(returnDate)}?marker=731864` : `${base}?marker=731864`
+  return returnDate
+    ? `${base}${toddmm(returnDate)}${origin}1?marker=731864`
+    : `${base}?marker=731864`
 }
 
 const MODE_HINTS: Record<SearchMode, string> = {
