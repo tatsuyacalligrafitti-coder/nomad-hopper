@@ -77,6 +77,8 @@ function groupToFlightResult(
       query.departureDate,
       query.passengers,
     ),
+    ...(group.booking_token   ? { serpBookingToken:   group.booking_token   } : {}),
+    ...(group.departure_token ? { serpDepartureToken: group.departure_token } : {}),
   }
 }
 

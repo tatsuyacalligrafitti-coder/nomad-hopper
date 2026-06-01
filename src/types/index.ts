@@ -36,6 +36,8 @@ export interface FlightResult {
   bookingLink?: string
   mode?: SearchMode
   score?: number
+  serpBookingToken?: string
+  serpDepartureToken?: string
 }
 
 export interface ParsedQuery {
