@@ -20,14 +20,27 @@ interface ExploreParams {
 }
 
 function aviasalesUrl(origin: string, destination: string, departureDate: string, returnDate?: string | null): string {
+  if (returnDate) {
+    const params = [
+      `segments[0][origin_iata]=${origin}`,
+      `segments[0][destination_iata]=${destination}`,
+      `segments[0][depart_date]=${departureDate}`,
+      `segments[1][origin_iata]=${destination}`,
+      `segments[1][destination_iata]=${origin}`,
+      `segments[1][depart_date]=${returnDate}`,
+      'adults=1',
+      'children=0',
+      'infants=0',
+      'trip_class=0',
+      'marker=731864',
+    ].join('&')
+    return `https://www.aviasales.com/flights/?${params}`
+  }
   const toddmm = (iso: string) => {
     const [, m, d] = iso.split('-')
     return `${d}${m}`
   }
-  const base = `https://www.aviasales.com/search/${origin}${toddmm(departureDate)}${destination}1`
-  return returnDate
-    ? `${base}${toddmm(returnDate)}${origin}1?marker=731864`
-    : `${base}?marker=731864`
+  return `https://www.aviasales.com/search/${origin}${toddmm(departureDate)}${destination}1?marker=731864`
 }
 
 const MODE_HINTS: Record<SearchMode, string> = {
