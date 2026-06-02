@@ -4,8 +4,29 @@ import { useState, useEffect } from 'react'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const STORAGE_KEY = 'tobira_onboarding_shown'
-const TOTAL_PAGES = 6
+const LATEST_UPDATE_VERSION = '2026-06-02'
+const UPDATE_STORAGE_KEY = 'tobira_update_seen'
+const TOTAL_PAGES = 7
 
+type OpenReason = 'initial' | 'update' | 'help' | null
+
+function safeGetStorage(key: string): string | null {
+  try {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function safeSetStorage(key: string, value: string): void {
+  try {
+    if (typeof window === 'undefined') return
+    localStorage.setItem(key, value)
+  } catch {}
+}
+
+// ─── Pages ─────────────────────────────────────────────────────────────────────
 function Page1() {
   return (
     <div className="space-y-5">
@@ -164,8 +185,6 @@ function Page4() {
 
 function Page5() {
   const items = [
-    '国内線の検索が苦手',
-    'JAL・ANAなど一部FSCのデータが薄い',
     '北米・中米路線はデータ不足の場合あり',
     '表示価格は参考値（予約時に変動する場合あり）',
     '実際の予約は外部サイトへの誘導',
@@ -192,7 +211,8 @@ function Page5() {
   )
 }
 
-function Page6({ onClose }: { onClose: () => void }) {
+// Page6 is no longer the final page — CTA button removed, navigation footer handles progression
+function Page6() {
   const roadmap = [
     { icon: '✈️', text: '陸マイラーサポート機能' },
     { icon: '🗺️', text: '地図で旅程を視覚化' },
@@ -225,6 +245,35 @@ function Page6({ onClose }: { onClose: () => void }) {
           「こんな機能があれば使う」など何でも歓迎です。
         </p>
       </div>
+    </div>
+  )
+}
+
+function Page7({ onClose }: { onClose: () => void }) {
+  const updates = [
+    '国内線（JAL・ANA・スカイマーク・ソラシドエア等）に対応',
+    '予約先を一覧で比較できる「予約先パネル」を追加',
+    '航空会社公式サイトの予約ページへ直接ジャンプ',
+    '「来週」など曖昧な日付はAIが相談モードで日程を確認',
+  ]
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">🎉 アップデート情報</h2>
+        <p className="text-xs text-gray-400 mt-1">2026年6月2日</p>
+      </div>
+      <ul className="space-y-3">
+        {updates.map((item) => (
+          <li key={item} className="flex items-start gap-2 text-sm text-gray-700">
+            <span className="shrink-0 text-green-500">✅</span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-indigo-500 text-center pt-1">
+        今後もアップデートを続けていきます
+      </p>
 
       <button
         onClick={onClose}
@@ -236,6 +285,7 @@ function Page6({ onClose }: { onClose: () => void }) {
   )
 }
 
+// ─── Main component ────────────────────────────────────────────────────────────
 interface Props {
   forcedOpen?: boolean
   onForcedClose?: () => void
@@ -244,29 +294,52 @@ interface Props {
 export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [page, setPage] = useState(0)
+  const [openReason, setOpenReason] = useState<OpenReason>(null)
 
+  // Determine initial display on mount
   useEffect(() => {
-    if (!localStorage.getItem(STORAGE_KEY)) {
+    const onboardingSeen = !!safeGetStorage(STORAGE_KEY)
+    const updateSeen = safeGetStorage(UPDATE_STORAGE_KEY) === LATEST_UPDATE_VERSION
+
+    if (!onboardingSeen) {
+      setPage(0)
+      setOpenReason('initial')
+      setIsOpen(true)
+    } else if (!updateSeen) {
+      setPage(TOTAL_PAGES - 1) // Jump straight to the update page
+      setOpenReason('update')
       setIsOpen(true)
     }
   }, [])
 
-  // Reset to page 0 whenever externally opened
+  // forcedOpen: show from page 1 (same as "?" help)
   useEffect(() => {
-    if (forcedOpen) setPage(0)
+    if (forcedOpen) {
+      setPage(0)
+      setOpenReason('help')
+      setIsOpen(true)
+    }
   }, [forcedOpen])
 
   const isVisible = isOpen || !!forcedOpen
 
   const close = () => {
-    localStorage.setItem(STORAGE_KEY, 'true')
+    if (openReason === 'initial') {
+      safeSetStorage(STORAGE_KEY, 'true')
+      safeSetStorage(UPDATE_STORAGE_KEY, LATEST_UPDATE_VERSION)
+    } else if (openReason === 'update') {
+      safeSetStorage(UPDATE_STORAGE_KEY, LATEST_UPDATE_VERSION)
+    }
+    // 'help': no localStorage writes
     setIsOpen(false)
     setPage(0)
+    setOpenReason(null)
     onForcedClose?.()
   }
 
   const openHelp = () => {
     setPage(0)
+    setOpenReason('help')
     setIsOpen(true)
   }
 
@@ -300,10 +373,11 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
               {page === 2 && <Page3 />}
               {page === 3 && <Page4 />}
               {page === 4 && <Page5 />}
-              {page === 5 && <Page6 onClose={close} />}
+              {page === 5 && <Page6 />}
+              {page === 6 && <Page7 onClose={close} />}
             </div>
 
-            {/* Navigation footer */}
+            {/* Navigation footer — shown for all pages except the last */}
             {page < TOTAL_PAGES - 1 && (
               <div className="px-6 pb-5 pt-3 shrink-0 space-y-4">
                 {/* Dots */}
@@ -346,9 +420,9 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
               </div>
             )}
 
-            {/* Dots on last page (no nav buttons — Page6 has its own CTA) */}
+            {/* Dots only on last page — Page7 has its own CTA button */}
             {page === TOTAL_PAGES - 1 && (
-              <div className="flex justify-center gap-1.5 pb-5 pt-2 shrink-0">
+              <div className="flex justify-center gap-1.5 pb-3 pt-2 shrink-0">
                 {Array.from({ length: TOTAL_PAGES }).map((_, i) => (
                   <button
                     key={i}
