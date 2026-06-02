@@ -29,8 +29,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ja" className={`${geist.variable} antialiased`}>
       <body className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-sky-50">
         {children}
-        <footer className="text-center pb-6 pt-2">
-          <Link href="/changelog" className="text-xs text-gray-400 hover:text-indigo-500 transition-colors">
+        <footer className="text-center pb-6 pt-2 border-t border-gray-100 mt-4 space-y-1.5">
+          <p className="text-xs text-gray-400">2026 Tobira · 世界への扉を、あなたの手に。</p>
+          <Link href="/changelog" className="text-sm text-gray-500 hover:text-indigo-500 underline transition-colors">
             更新履歴
           </Link>
         </footer>
