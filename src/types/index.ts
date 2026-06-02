@@ -60,10 +60,17 @@ export interface AlertRequest {
   departureDate: string
 }
 
+export interface PriceInsights {
+  lowestPrice: number
+  priceLevel: 'low' | 'typical' | 'high' | string
+  typicalPriceRange: [number, number] | null
+}
+
 export interface CategorizedFlights {
   cheapest: FlightResult[]
   cheapestDirect: FlightResult[]
   recommended: FlightResult[]
+  priceInsights?: PriceInsights
 }
 
 // ── Multi-city ────────────────────────────────────────────────────────────────

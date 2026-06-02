@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const flights = await searchAllProviders(query)
+      const { flights } = await searchAllProviders(query)
       const sorted = [...flights].sort((a, b) => a.totalPrice - b.totalPrice)
       results.push({
         origin: seg.origin,

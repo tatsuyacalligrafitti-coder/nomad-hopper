@@ -1,4 +1,4 @@
-import type { FlightResult } from '@/types'
+import type { FlightResult, PriceInsights } from '@/types'
 
 export interface NormalizedFlight {
   origin: string
@@ -12,4 +12,5 @@ export interface NormalizedFlight {
   stops: number
   sources: string[]           // which providers returned this flight
   raw: FlightResult           // original data passed through for UI rendering
+  serpPriceInsights?: PriceInsights
 }
