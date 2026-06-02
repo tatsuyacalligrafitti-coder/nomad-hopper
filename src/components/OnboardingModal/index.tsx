@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CHANGELOG } from '@/lib/changelog'
 
 const STORAGE_KEY = 'tobira_onboarding_shown'
-const LATEST_UPDATE_VERSION = '2026-06-02'
+const LATEST_UPDATE_VERSION = CHANGELOG[0].date
 const UPDATE_STORAGE_KEY = 'tobira_update_seen'
 const TOTAL_PAGES = 7
 
@@ -249,22 +250,23 @@ function Page6() {
   )
 }
 
+function formatDateJa(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return `${y}年${m}月${d}日`
+}
+
 function Page7({ onClose }: { onClose: () => void }) {
-  const updates = [
-    '国内線（JAL・ANA・スカイマーク・ソラシドエア等）に対応',
-    '予約先を一覧で比較できる「予約先パネル」を追加',
-    '航空会社公式サイトの予約ページへ直接ジャンプ',
-    '「来週」など曖昧な日付はAIが相談モードで日程を確認',
-  ]
+  const latest = CHANGELOG[0]
 
   return (
     <div className="space-y-5">
       <div>
         <h2 className="text-xl font-bold text-gray-900">🎉 アップデート情報</h2>
-        <p className="text-xs text-gray-400 mt-1">2026年6月2日</p>
+        <p className="text-xs text-gray-400 mt-1">{formatDateJa(latest.date)}</p>
+        <p className="text-sm font-semibold text-indigo-700 mt-2">{latest.title}</p>
       </div>
       <ul className="space-y-3">
-        {updates.map((item) => (
+        {latest.items.map((item) => (
           <li key={item} className="flex items-start gap-2 text-sm text-gray-700">
             <span className="shrink-0 text-green-500">✅</span>
             <span>{item}</span>

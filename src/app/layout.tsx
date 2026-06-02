@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist } from 'next/font/google'
+import Link from 'next/link'
 import './globals.css'
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
@@ -28,6 +29,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ja" className={`${geist.variable} antialiased`}>
       <body className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-sky-50">
         {children}
+        <footer className="text-center pb-6 pt-2">
+          <Link href="/changelog" className="text-xs text-gray-400 hover:text-indigo-500 transition-colors">
+            更新履歴
+          </Link>
+        </footer>
       </body>
     </html>
   )
