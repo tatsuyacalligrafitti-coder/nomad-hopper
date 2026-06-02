@@ -1,4 +1,4 @@
-import type { SearchQuery, FlightResult } from '@/types'
+import type { SearchQuery, FlightResult, PriceInsights } from '@/types'
 import type { FlightProvider } from './flight-sources/base'
 import { RapidAPIProvider } from './flight-sources/rapidapi-provider'
 import { DuffelProvider } from './flight-sources/duffel-provider'
@@ -12,7 +12,9 @@ const providers: FlightProvider[] = [
   new SerpAPIProvider(),
 ]
 
-export async function searchAllProviders(query: SearchQuery): Promise<FlightResult[]> {
+export async function searchAllProviders(
+  query: SearchQuery,
+): Promise<{ flights: FlightResult[]; priceInsights?: PriceInsights }> {
   const settled = await Promise.allSettled(
     providers.map(async (p) => {
       console.log(`[${p.name}] 検索開始`)
@@ -29,7 +31,10 @@ export async function searchAllProviders(query: SearchQuery): Promise<FlightResu
     return []
   })
 
+  // Extract price_insights carried by the first SerpAPI flight
+  const priceInsights = groups.flat().find((f) => f.serpPriceInsights)?.serpPriceInsights
+
   const merged = mergeFlights(groups)
   console.log(`[orchestrator] 合計${merged.length}件`)
-  return merged.map((f) => f.raw)
+  return { flights: merged.map((f) => f.raw), priceInsights }
 }

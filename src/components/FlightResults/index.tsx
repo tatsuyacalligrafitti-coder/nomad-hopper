@@ -178,7 +178,7 @@ function TpCard({ flight, badge, showBusinessBadge, isOneWay, query }: { flight:
 
 // ─── Category section ─────────────────────────────────────────────────────────
 interface CategoryConfig {
-  key: keyof CategorizedFlights
+  key: 'cheapest' | 'cheapestDirect' | 'recommended'
   icon: string
   title: string
   badge: string

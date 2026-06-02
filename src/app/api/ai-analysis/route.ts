@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import type { CategorizedFlights, SearchQuery } from '@/types'
+import type { CategorizedFlights, SearchQuery, PriceInsights } from '@/types'
 
 function buildSystemPrompt(): string {
   const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -20,7 +20,26 @@ function buildSystemPrompt(): string {
 ルール：
 - verdictは必ず「◎今すぐ」「△様子見」「✗待つべき」のいずれか
 - suggestionsは必ず1〜3件含めること（同区間の別航空会社・直行便の有無・前後1週間の日程など）
-- 東京→バンコクの相場（エコノミー往復6〜12万円、ビジネス20〜40万円）などの知識を活用して判断`
+- 「Googleの実データ」が提供されている場合は、その価格レベル判定を最優先の根拠として使うこと
+- 実データがない場合は、東京→バンコクの相場（エコノミー往復6〜12万円、ビジネス20〜40万円）などの知識を活用して判断`
+}
+
+function buildPriceInsightsSection(pi: PriceInsights): string {
+  const levelLabel: Record<string, string> = {
+    low: '安い（割安）',
+    typical: '平均的',
+    high: '高い（割高）',
+  }
+  const level = levelLabel[pi.priceLevel] ?? pi.priceLevel
+  const range = pi.typicalPriceRange
+    ? `¥${pi.typicalPriceRange[0].toLocaleString()}〜¥${pi.typicalPriceRange[1].toLocaleString()}`
+    : '不明'
+  return [
+    '【Googleの実データ（最優先で参照すること）】',
+    `価格レベル: ${level}`,
+    `この路線の通常価格帯: ${range}`,
+    `Googleが記録した過去最安値: ¥${pi.lowestPrice.toLocaleString()}`,
+  ].join('\n')
 }
 
 interface RequestBody {
@@ -70,6 +89,8 @@ export async function POST(request: NextRequest) {
 
   const cabinLabel = query.cabinClass === 'business' ? 'ビジネスクラス' : 'エコノミー'
 
+  const priceInsights: PriceInsights | undefined = categorized.priceInsights
+
   const userMessage = [
     `出発地: ${query.origin}`,
     `目的地: ${query.destination}`,
@@ -77,6 +98,8 @@ export async function POST(request: NextRequest) {
     query.returnDate ? `帰国日: ${query.returnDate}` : null,
     `座席クラス: ${cabinLabel}`,
     '',
+    priceInsights ? buildPriceInsightsSection(priceInsights) : null,
+    priceInsights ? '' : null,
     '検索結果の価格一覧:',
     priceList,
     '',

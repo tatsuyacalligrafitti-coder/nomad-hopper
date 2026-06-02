@@ -1,4 +1,4 @@
-import type { SearchQuery, FlightResult, FlightSegment } from '@/types'
+import type { SearchQuery, FlightResult, FlightSegment, PriceInsights } from '@/types'
 import { aviasalesLink } from '@/lib/travelpayouts'
 import type { FlightProvider } from './base'
 import type { NormalizedFlight } from './types'
@@ -27,10 +27,17 @@ interface SerpFlightGroup {
   booking_token?: string
 }
 
+interface SerpPriceInsights {
+  lowest_price?: number
+  price_level?: string
+  typical_price_range?: number[]
+}
+
 interface SerpAPIResponse {
   error?: string
   best_flights?: SerpFlightGroup[]
   other_flights?: SerpFlightGroup[]
+  price_insights?: SerpPriceInsights
 }
 
 // "2026-06-08 06:45" → "2026-06-08T06:45:00"
@@ -129,6 +136,21 @@ export class SerpAPIProvider implements FlightProvider {
     ]
     console.log(`[serpapi] ${groups.length}件取得`)
 
+    // Normalize price_insights (one per search, attached to first flight as carrier)
+    let priceInsights: PriceInsights | undefined
+    const pi = data.price_insights
+    if (pi && pi.lowest_price != null && pi.price_level) {
+      const range = Array.isArray(pi.typical_price_range) && pi.typical_price_range.length >= 2
+        ? [pi.typical_price_range[0], pi.typical_price_range[1]] as [number, number]
+        : null
+      priceInsights = {
+        lowestPrice: pi.lowest_price,
+        priceLevel: pi.price_level,
+        typicalPriceRange: range,
+      }
+      console.log('[serpapi] price_insights:', priceInsights)
+    }
+
     return groups.map((group, i) => {
       const result = groupToFlightResult(group, query, i)
       const first = group.flights[0]
@@ -145,6 +167,8 @@ export class SerpAPIProvider implements FlightProvider {
         stops: Math.max(0, group.flights.length - 1),
         sources: [this.name],
         raw: result,
+        // Attach price_insights to the first flight only; orchestrator extracts it
+        ...(i === 0 && priceInsights ? { serpPriceInsights: priceInsights } : {}),
       }
     })
   }

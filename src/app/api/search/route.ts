@@ -65,8 +65,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const flights = await searchAllProviders(query)
+    const { flights, priceInsights } = await searchAllProviders(query)
     const categorized = categorize(flights)
+    if (priceInsights) categorized.priceInsights = priceInsights
     return Response.json({ categorized, total: flights.length })
   } catch (err) {
     console.error('[search]', err)
