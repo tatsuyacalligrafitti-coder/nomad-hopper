@@ -671,11 +671,8 @@ export default function HomePage() {
         </a>
       </div>
 
-      <footer className="text-center text-xs text-gray-400 py-6 border-t border-gray-100 mt-4">
-        2026 Tobira · 世界への扉を、あなたの手に。
-      </footer>
 
-      {/* AI Chat — fixed position, always rendered */}
+{/* AI Chat — fixed position, always rendered */}
       <AIChat
         ref={aiChatRef}
         query={lastQuery}
