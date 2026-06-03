@@ -5,6 +5,7 @@ import { Plane, Clock, Zap } from 'lucide-react'
 import type { CategorizedFlights, FlightResult, SearchQuery } from '@/types'
 import AlertModal from '@/components/AlertModal'
 import BookingOptionsPanel from '@/components/BookingOptionsPanel'
+import PriceHistoryChart from '@/components/PriceHistoryChart'
 
 interface Props {
   categorized: CategorizedFlights | null
@@ -330,6 +331,14 @@ export default function FlightResults({ categorized, isLoading, error, query, mo
           <p className="text-sm text-gray-500 px-0.5">
             Powered by Travelpayouts · 最大9件を3カテゴリで表示
           </p>
+          {categorized!.priceInsights?.priceHistory && categorized!.priceInsights.priceHistory.length >= 2 && (
+            <PriceHistoryChart
+              priceHistory={categorized!.priceInsights.priceHistory}
+              lowestPrice={categorized!.priceInsights.lowestPrice}
+              priceLevel={categorized!.priceInsights.priceLevel}
+              estimatedSavings={categorized!.priceInsights.estimatedSavings}
+            />
+          )}
           {CATEGORIES.map((cfg) => (
             <CategorySection
               key={cfg.key}
