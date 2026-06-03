@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server'
-import type { CategorizedFlights, SearchQuery, PriceInsights } from '@/types'
+import type { CategorizedFlights, SearchQuery } from '@/types'
 
 function buildSystemPrompt(): string {
   const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
   return `今日の日付は${today}です。
 
-あなたは航空券の価格分析の専門家です。提供された価格データを分析して、以下のJSON形式のみで回答してください。前置き・後書き・コードブロック記号は不要です。JSONだけを出力してください。
+あなたは航空券の便選びアドバイザーです。相場水準の判断はグラフに任せます。ここでは表示されている便の中から、ユーザーの目的（最安・乗り継ぎ回数・航空会社の信頼性・快適さ等）に合わせてどの便が最適かをアドバイスしてください。以下のJSON形式のみで回答してください。前置き・後書き・コードブロック記号は不要です。JSONだけを出力してください。
 
 {
   "verdict": "◎今すぐ",
@@ -18,29 +18,11 @@ function buildSystemPrompt(): string {
 }
 
 ルール：
-- verdictは必ず「◎今すぐ」「△様子見」「✗待つべき」のいずれか
-- suggestionsは必ず1〜3件含めること（同区間の別航空会社・直行便の有無・前後1週間の日程など）
-- 「Googleの実データ」が提供されている場合は、その価格レベル判定を最優先の根拠として使うこと
-- 実データがない場合は、東京→バンコクの相場（エコノミー往復6〜12万円、ビジネス20〜40万円）などの知識を活用して判断`
+- verdictは必ず「◎今すぐ」「△様子見」「✗待つべき」のいずれか。根拠は「この便の選択の観点」で判断すること（例: 最安便が他より大幅に安く今選ぶ価値がある → ◎今すぐ）
+- suggestionsは必ず1〜3件含めること（同区間の別航空会社・直行便の有無・乗り継ぎ時間・預け荷物の有無など便選びに関する質問）
+- 相場が高いか安いかの繰り返しはしない。便の比較・選択に集中すること`
 }
 
-function buildPriceInsightsSection(pi: PriceInsights): string {
-  const levelLabel: Record<string, string> = {
-    low: '安い（割安）',
-    typical: '平均的',
-    high: '高い（割高）',
-  }
-  const level = levelLabel[pi.priceLevel] ?? pi.priceLevel
-  const range = pi.typicalPriceRange
-    ? `¥${pi.typicalPriceRange[0].toLocaleString()}〜¥${pi.typicalPriceRange[1].toLocaleString()}`
-    : '不明'
-  return [
-    '【Googleの実データ（最優先で参照すること）】',
-    `価格レベル: ${level}`,
-    `この路線の通常価格帯: ${range}`,
-    `Googleが記録した過去最安値: ¥${pi.lowestPrice.toLocaleString()}`,
-  ].join('\n')
-}
 
 interface RequestBody {
   query: SearchQuery
@@ -89,8 +71,6 @@ export async function POST(request: NextRequest) {
 
   const cabinLabel = query.cabinClass === 'business' ? 'ビジネスクラス' : 'エコノミー'
 
-  const priceInsights: PriceInsights | undefined = categorized.priceInsights
-
   const userMessage = [
     `出発地: ${query.origin}`,
     `目的地: ${query.destination}`,
@@ -98,15 +78,13 @@ export async function POST(request: NextRequest) {
     query.returnDate ? `帰国日: ${query.returnDate}` : null,
     `座席クラス: ${cabinLabel}`,
     '',
-    priceInsights ? buildPriceInsightsSection(priceInsights) : null,
-    priceInsights ? '' : null,
     '検索結果の価格一覧:',
     priceList,
     '',
     `最安値: ¥${minPrice}`,
     `最高値: ¥${maxPrice}`,
     '',
-    'この価格は今が買い時か分析してください。',
+    'この中でどの便が最適かアドバイスしてください。',
   ].filter(l => l !== null).join('\n')
 
   const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
