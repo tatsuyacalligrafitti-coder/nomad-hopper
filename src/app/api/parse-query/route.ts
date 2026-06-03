@@ -344,7 +344,7 @@ function tryParseMultiCity(query: string): MultiCityParsedQuery | null {
   //   "東京から7月3日にバンコク、7月8日にプラハ、7月14日に東京へ戻る"
   //   "7月3日東京発バンコク経由、7月8日プラハへ、7月14日帰国"
   {
-    const DATE_RX = /\d{1,2}月\d{1,2}日|\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2}/
+    const DATE_RX = /\d{1,2}月の?\d{1,2}日|\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2}/
 
     // Identify departure origin: from "Xから", "[date]X発", or "Xを出発して"
     let dcOrigin: string | null = null
@@ -378,6 +378,7 @@ function tryParseMultiCity(query: string): MultiCityParsedQuery | null {
         const cityText = chunk
           .replace(DATE_RX, '')         // remove date token
           .replace(/^.+?から/, '')      // strip "Xから" prefix
+          .replace(/出発/g, '')         // remove 出発 before 発-stripping (prevents lazy /^.+?発/ eating city name)
           .replace(/^.+?発/, '')        // strip "X発" prefix (e.g. "東京発")
           .replace(/経由.*$/, '')       // strip "経由..." suffix (keep city before it)
           .replace(/[にへでは]\s*/g, '') // remove Japanese particles
@@ -395,7 +396,9 @@ function tryParseMultiCity(query: string): MultiCityParsedQuery | null {
           segments.push({ origin: prev, destination: iata, date })
           prev = iata
         }
-        if (segments.length >= 2) {
+        // A→B→A with exactly 2 segments is a round-trip; let the round-trip path handle it
+        const isRoundTrip = segments.length === 2 && segments[1].destination === dcOrigin
+        if (!isRoundTrip && segments.length >= 2) {
           return { type: 'multi-city', segments, passengers, cabinClass }
         }
       }
