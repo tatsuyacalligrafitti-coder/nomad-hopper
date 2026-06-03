@@ -275,8 +275,8 @@ export function parseDate(text: string): string | null {
   const today = new Date()
   const year = today.getFullYear()
 
-  // "12月25日" or "12月25"
-  const jpDate = text.match(/(\d{1,2})月(\d{1,2})日?/)
+  // "12月25日", "12月の25日", or "12月25"
+  const jpDate = text.match(/(\d{1,2})月の?(\d{1,2})日?/)
   if (jpDate) {
     const m = jpDate[1].padStart(2, '0')
     const d = jpDate[2].padStart(2, '0')
