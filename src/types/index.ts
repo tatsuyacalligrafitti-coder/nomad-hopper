@@ -64,6 +64,8 @@ export interface PriceInsights {
   lowestPrice: number
   priceLevel: 'low' | 'typical' | 'high' | string
   typicalPriceRange: [number, number] | null
+  priceHistory: { price: number; date: string }[] | null
+  estimatedSavings: number | null
 }
 
 export interface CategorizedFlights {

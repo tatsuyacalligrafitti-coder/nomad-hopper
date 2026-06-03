@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Sparkles, Loader2, Send } from 'lucide-react'
-import type { CategorizedFlights, SearchQuery } from '@/types'
+import { format, parseISO } from 'date-fns'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts'
+import type { CategorizedFlights, SearchQuery, PriceInsights } from '@/types'
 
 interface AISuggestion {
   label: string
@@ -68,6 +70,58 @@ const CHAT_SUGGESTIONS = [
   'マイルで行く場合いくら必要？',
 ]
 
+function PriceHistoryChart({ priceHistory, lowestPrice, priceLevel, estimatedSavings }: Pick<PriceInsights, 'priceHistory' | 'lowestPrice' | 'priceLevel' | 'estimatedSavings'> & { priceHistory: { price: number; date: string }[] }) {
+  const lineColor = priceLevel === 'low' ? '#16a34a' : priceLevel === 'high' ? '#dc2626' : '#6366f1'
+
+  return (
+    <div className="space-y-2">
+      {estimatedSavings != null && estimatedSavings > 0 && (
+        <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 font-medium">
+          💰 今予約すると約¥{estimatedSavings.toLocaleString()}お得
+        </p>
+      )}
+      <ResponsiveContainer width="100%" height={160}>
+        <LineChart data={priceHistory} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
+          <XAxis
+            dataKey="date"
+            tickFormatter={(d: string) => format(parseISO(d), 'M/d')}
+            tick={{ fontSize: 10, fill: '#6b7280' }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            tickFormatter={(v: number) => `¥${v.toLocaleString()}`}
+            tick={{ fontSize: 10, fill: '#6b7280' }}
+            tickLine={false}
+            axisLine={false}
+            width={72}
+          />
+          <Tooltip
+            formatter={(value) => [`¥${Number(value).toLocaleString()}`, '価格']}
+            labelFormatter={(label) => { try { return format(parseISO(String(label)), 'yyyy年M月d日') } catch { return String(label) } }}
+            contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e0e7ff' }}
+          />
+          <ReferenceLine
+            y={lowestPrice}
+            stroke={lineColor}
+            strokeDasharray="4 2"
+            label={{ value: '現在最安値', position: 'insideTopRight', fontSize: 9, fill: lineColor }}
+          />
+          <Line
+            type="monotone"
+            dataKey="price"
+            stroke={lineColor}
+            strokeWidth={2}
+            dot={{ r: 2, fill: lineColor }}
+            activeDot={{ r: 4 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
 function TypingDots() {
   return (
     <div className="flex items-center gap-1 px-3 py-2">
@@ -86,6 +140,7 @@ export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [chartOpen, setChartOpen] = useState(false)
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
@@ -103,6 +158,7 @@ export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
     setLoading(true)
     setError('')
     setChatMessages([])
+    setChartOpen(false)
     try {
       const res = await fetch('/api/ai-analysis', {
         method: 'POST',
@@ -203,7 +259,7 @@ export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
               <span className="text-sm font-bold text-indigo-700">AI価格分析</span>
             </div>
             <button
-              onClick={() => { setResult(null); setError(''); setChatMessages([]) }}
+              onClick={() => { setResult(null); setError(''); setChatMessages([]); setChartOpen(false) }}
               className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
             >
               閉じる
@@ -229,6 +285,28 @@ export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">
               <p className="text-xs font-semibold text-amber-700">⚠️ 注意点</p>
               <p className="text-sm text-amber-800 leading-relaxed">{result.caution}</p>
+            </div>
+          )}
+
+          {categorized.priceInsights?.priceHistory && categorized.priceInsights.priceHistory.length >= 2 && (
+            <div className="space-y-2">
+              <button
+                onClick={() => setChartOpen((o) => !o)}
+                className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+              >
+                <span>📈 価格の推移を見る</span>
+                <span className="text-gray-400 text-[10px]">{chartOpen ? '▲' : '▼'}</span>
+              </button>
+              {chartOpen && (
+                <div className="rounded-xl border border-indigo-100 bg-white px-3 pt-3 pb-1">
+                  <PriceHistoryChart
+                    priceHistory={categorized.priceInsights.priceHistory}
+                    lowestPrice={categorized.priceInsights.lowestPrice}
+                    priceLevel={categorized.priceInsights.priceLevel}
+                    estimatedSavings={categorized.priceInsights.estimatedSavings}
+                  />
+                </div>
+              )}
             </div>
           )}
 
