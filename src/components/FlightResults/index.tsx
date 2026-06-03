@@ -337,6 +337,9 @@ export default function FlightResults({ categorized, isLoading, error, query, mo
               lowestPrice={categorized!.priceInsights.lowestPrice}
               priceLevel={categorized!.priceInsights.priceLevel}
               estimatedSavings={categorized!.priceInsights.estimatedSavings}
+              typicalPriceRange={categorized!.priceInsights.typicalPriceRange}
+              origin={query?.origin}
+              destination={query?.destination}
             />
           )}
           {CATEGORIES.map((cfg) => (
