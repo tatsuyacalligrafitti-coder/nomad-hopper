@@ -31,6 +31,8 @@ interface SerpPriceInsights {
   lowest_price?: number
   price_level?: string
   typical_price_range?: number[]
+  price_history?: [number, number][]
+  cheapest_to_book?: { estimated_savings: number }
 }
 
 interface SerpAPIResponse {
@@ -147,6 +149,10 @@ export class SerpAPIProvider implements FlightProvider {
         lowestPrice: pi.lowest_price,
         priceLevel: pi.price_level,
         typicalPriceRange: range,
+        priceHistory: Array.isArray(pi.price_history) && pi.price_history.length > 0
+          ? pi.price_history.map(([ts, price]) => ({ price, date: new Date(ts * 1000).toISOString().slice(0, 10) }))
+          : null,
+        estimatedSavings: pi.cheapest_to_book?.estimated_savings ?? null,
       }
       console.log('[serpapi] price_insights:', priceInsights)
     }
