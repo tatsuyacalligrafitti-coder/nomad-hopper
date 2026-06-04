@@ -12,6 +12,7 @@ import MultiCityResults from '@/components/MultiCityResults'
 import AlertModal from '@/components/AlertModal'
 import OnboardingModal from '@/components/OnboardingModal'
 import type { CategorizedFlights, SearchMode, SearchQuery, MultiCityParsedQuery, MultiCitySearchResult, FlightResult } from '@/types'
+import { sortFlights } from '@/lib/sorting'
 
 interface ExploreParams {
   origin?: string
@@ -60,6 +61,15 @@ function selectByMode(flights: FlightResult[], mode: SearchMode): number {
     if (score < bestScore) { bestScore = score; bestIdx = i }
   })
   return bestIdx
+}
+
+function applyFastestSort(cats: CategorizedFlights): CategorizedFlights {
+  return {
+    ...cats,
+    cheapest: sortFlights(cats.cheapest, 'fastest'),
+    cheapestDirect: sortFlights(cats.cheapestDirect, 'fastest'),
+    recommended: sortFlights(cats.recommended, 'fastest'),
+  }
 }
 
 async function fetchFlights(query: SearchQuery): Promise<CategorizedFlights | null> {
@@ -292,6 +302,10 @@ export default function HomePage() {
         setElegantLoading(false)
       }
     } else if (prevMode === 'elegant' && baseCategorized) {
+      setCategorized(newMode === 'fastest' ? applyFastestSort(baseCategorized) : baseCategorized)
+    } else if (newMode === 'fastest' && baseCategorized) {
+      setCategorized(applyFastestSort(baseCategorized))
+    } else if (prevMode === 'fastest' && baseCategorized) {
       setCategorized(baseCategorized)
     }
   }
@@ -491,8 +505,12 @@ export default function HomePage() {
 
     try {
       const results = await fetchFlights(searchQuery)
-      setCategorized(results)
-      if (mode !== 'elegant') setBaseCategorized(results)
+      if (mode !== 'elegant') {
+        setBaseCategorized(results)
+        setCategorized(mode === 'fastest' && results ? applyFastestSort(results) : results)
+      } else {
+        setCategorized(results)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '検索に失敗しました')
       setCategorized(null)
