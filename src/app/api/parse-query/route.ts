@@ -8,7 +8,44 @@ import {
 } from '@/lib/parser'
 import { resolveFromDB } from '@/lib/airport-db'
 import { IATA_JP_NAMES } from '@/lib/iata-names'
-import type { MultiCityParsedQuery, MultiCitySegmentQuery } from '@/types'
+import type { MultiCityParsedQuery, MultiCitySegmentQuery, ParsedQuery, UnifiedQuery } from '@/types'
+
+// ── Converters to UnifiedQuery ────────────────────────────────────────────────
+
+function toUnified(q: ParsedQuery): UnifiedQuery {
+  const type = q.returnDate ? 'round-trip' : 'one-way'
+  const legs: UnifiedQuery['legs'] = [
+    {
+      origin: q.origin ?? '',
+      destination: q.destination ?? '',
+      date: q.departureDate ?? '',
+      date_role: 'departure',
+    },
+  ]
+  if (q.returnDate) {
+    legs.push({
+      origin: q.destination ?? '',
+      destination: q.origin ?? '',
+      date: q.returnDate,
+      date_role: 'arrival',
+    })
+  }
+  return { type, legs, passengers: q.passengers, cabinClass: q.cabinClass }
+}
+
+function toUnifiedMulti(q: MultiCityParsedQuery): UnifiedQuery {
+  return {
+    type: 'multi-city',
+    legs: q.segments.map(s => ({
+      origin: s.origin,
+      destination: s.destination,
+      date: s.date,
+      date_role: 'departure' as const,
+    })),
+    passengers: q.passengers,
+    cabinClass: q.cabinClass,
+  }
+}
 
 // Inverse lookup: Japanese city name → IATA code, sorted by name length desc
 // so longer names (e.g. "東京 羽田") are matched before shorter prefixes ("東京").
@@ -435,20 +472,12 @@ function tryParseMultiCity(query: string): MultiCityParsedQuery | null {
   return null
 }
 
-// ── Route handler ─────────────────────────────────────────────────────────────
+// ── Legacy regex parser (fallback) ───────────────────────────────────────────
 
-export async function POST(request: NextRequest) {
-  const { query } = await request.json()
-
-  if (!query || typeof query !== 'string') {
-    return Response.json({ error: 'query is required' }, { status: 400 })
-  }
-
-  // Multi-city takes priority
+function toUnifiedLegacy(query: string): UnifiedQuery {
   const multiCity = tryParseMultiCity(query)
-  if (multiCity) return Response.json(multiCity)
+  if (multiCity) return toUnifiedMulti(multiCity)
 
-  // Single-city path
   const parsed = parseSearchQuery(query)
 
   if (!parsed.origin || !parsed.destination) {
@@ -467,5 +496,107 @@ export async function POST(request: NextRequest) {
     if (!parsed.destination) parsed.destination = resolveFromDB(destFrag)   ?? resolveFromDB(query)
   }
 
-  return Response.json(parsed)
+  return toUnified(parsed)
+}
+
+// ── LLM parser ────────────────────────────────────────────────────────────────
+
+const VALID_DATE_ROLES = new Set(['departure', 'arrival', 'deadline'])
+
+async function parseWithLLM(query: string): Promise<UnifiedQuery | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return null
+
+  const today = new Date().toISOString().slice(0, 10)
+  const nextMonthDate = new Date()
+  nextMonthDate.setMonth(nextMonthDate.getMonth() + 1)
+  const nextMonth = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}-01`
+
+  const systemPrompt = `航空券検索クエリを解析してJSONで返すAIです。
+以下のフォーマットのみで返答してください（説明不要）：
+{"type":"one-way"|"round-trip"|"multi-city","legs":[{"origin":"都市名","destination":"都市名","date":"YYYY-MM-DD","date_role":"departure"|"arrival"|"deadline"}]}
+ルール：
+- 2区間でA→B→Aのパターンは round-trip
+- 3区間以上はmulti-city
+- 日付がない場合は来月の1日を使う（${nextMonth}）
+- 今日の日付: ${today}`
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: query }],
+      }),
+      signal: controller.signal,
+    })
+
+    if (!res.ok) return null
+
+    const data = await res.json()
+    const text: string = data.content?.[0]?.text ?? ''
+    const cleaned = text.replace(/^```(?:json)?\s*/m, '').replace(/```\s*$/m, '').trim()
+
+    let raw: { type?: unknown; legs?: unknown[] }
+    try {
+      raw = JSON.parse(cleaned)
+    } catch {
+      const match = cleaned.match(/\{[\s\S]*\}/)
+      if (!match) return null
+      try { raw = JSON.parse(match[0]) } catch { return null }
+    }
+
+    if (!raw.type || !Array.isArray(raw.legs) || raw.legs.length === 0) return null
+
+    const passengers = parsePassengers(query)
+    const cabinClass = parseCabinClass(query)
+
+    const legs: UnifiedQuery['legs'] = []
+    for (const leg of raw.legs) {
+      if (typeof leg !== 'object' || leg === null) return null
+      const l = leg as Record<string, unknown>
+      const origin = typeof l.origin === 'string' ? (resolveCity(l.origin) ?? l.origin) : ''
+      const destination = typeof l.destination === 'string' ? (resolveCity(l.destination) ?? l.destination) : ''
+      const date = typeof l.date === 'string' ? l.date : ''
+      const date_role = VALID_DATE_ROLES.has(l.date_role as string)
+        ? (l.date_role as 'departure' | 'arrival' | 'deadline')
+        : 'departure'
+      if (!origin || !destination || !date) return null
+      legs.push({ origin, destination, date, date_role })
+    }
+
+    const type = raw.type as UnifiedQuery['type']
+    if (type !== 'one-way' && type !== 'round-trip' && type !== 'multi-city') return null
+
+    return { type, legs, passengers, cabinClass }
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// ── Route handler ─────────────────────────────────────────────────────────────
+
+export async function POST(request: NextRequest) {
+  const { query } = await request.json()
+
+  if (!query || typeof query !== 'string') {
+    return Response.json({ error: 'query is required' }, { status: 400 })
+  }
+
+  const llmResult = await parseWithLLM(query)
+  if (llmResult) return Response.json(llmResult)
+
+  return Response.json(toUnifiedLegacy(query))
 }

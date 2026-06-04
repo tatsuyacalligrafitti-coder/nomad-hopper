@@ -11,7 +11,7 @@ import AIExploreChat from '@/components/AIExploreChat'
 import MultiCityResults from '@/components/MultiCityResults'
 import AlertModal from '@/components/AlertModal'
 import OnboardingModal from '@/components/OnboardingModal'
-import type { CategorizedFlights, SearchMode, SearchQuery, MultiCityParsedQuery, MultiCitySearchResult, FlightResult } from '@/types'
+import type { CategorizedFlights, SearchMode, SearchQuery, MultiCityParsedQuery, MultiCitySearchResult, FlightResult, UnifiedQuery } from '@/types'
 import { sortFlights } from '@/lib/sorting'
 
 interface ExploreParams {
@@ -37,6 +37,37 @@ const MODE_HINTS: Record<SearchMode, string> = {
   elegant: 'ビジネスクラス専用・価格の安い順で表示',
   fastest: '最も早く到着する便を探します',
 }
+
+// ── UnifiedQuery adapters ─────────────────────────────────────────────────────
+
+function unifiedToSearchQuery(uq: UnifiedQuery, rawQuery: string): SearchQuery {
+  const dep = uq.legs[0]
+  const ret = uq.type === 'round-trip' ? uq.legs.find(l => l.date_role === 'arrival') : undefined
+  return {
+    origin: dep.origin,
+    destination: dep.destination,
+    departureDate: dep.date,
+    returnDate: ret?.date,
+    passengers: uq.passengers,
+    cabinClass: uq.cabinClass,
+    rawQuery,
+  }
+}
+
+function unifiedToMultiCity(uq: UnifiedQuery): MultiCityParsedQuery {
+  return {
+    type: 'multi-city',
+    segments: uq.legs.map(l => ({ origin: l.origin, destination: l.destination, date: l.date })),
+    passengers: uq.passengers,
+    cabinClass: uq.cabinClass,
+  }
+}
+
+function isValidUnified(uq: UnifiedQuery): boolean {
+  return uq.legs.length > 0 && !!uq.legs[0].origin && !!uq.legs[0].destination && !!uq.legs[0].date
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function selectByMode(flights: FlightResult[], mode: SearchMode): number {
   if (flights.length === 0) return 0
@@ -204,8 +235,13 @@ export default function HomePage() {
       body: JSON.stringify({ query: q }),
     })
       .then(res => res.json())
-      .then(data => {
-        if (data?.type === 'multi-city') handleMultiCitySearch(data)
+      .then((uq: UnifiedQuery) => {
+        if (!isValidUnified(uq)) return
+        if (uq.type === 'multi-city') {
+          handleMultiCitySearch(unifiedToMultiCity(uq))
+        } else {
+          handleSearch(unifiedToSearchQuery(uq, q))
+        }
       })
       .catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -510,11 +546,12 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: rawQuery }),
       })
-      const parsed = await res.json()
-      if (parsed?.type === 'multi-city') {
-        handleMultiCitySearch(parsed, rawQuery)
-      } else if (parsed?.origin && parsed?.destination && parsed?.departureDate) {
-        handleSearch(parsed)
+      const uq: UnifiedQuery = await res.json()
+      if (!isValidUnified(uq)) return
+      if (uq.type === 'multi-city') {
+        handleMultiCitySearch(unifiedToMultiCity(uq), rawQuery)
+      } else {
+        handleSearch(unifiedToSearchQuery(uq, rawQuery))
       }
       // If parse returns incomplete data (no date/airports), leave the query
       // in the search bar so the user can refine it manually — no error shown.
