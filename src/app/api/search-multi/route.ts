@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const { flights } = await searchAllProviders(query)
+      const { flights, priceInsights } = await searchAllProviders(query)
       const sorted = [...flights].sort((a, b) => a.totalPrice - b.totalPrice)
       results.push({
         origin: seg.origin,
@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
         cheapestPrice: sorted[0]?.totalPrice ?? null,
         cheapestFlight: sorted[0] ?? null,
         top5Flights: sorted.slice(0, 5),
+        priceInsights: priceInsights ?? null,
       })
     } catch {
       results.push({
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
         cheapestPrice: null,
         cheapestFlight: null,
         top5Flights: [],
+        priceInsights: null,
       })
     }
   }

@@ -10,6 +10,7 @@ import { aviasalesLink } from '@/lib/travelpayouts'
 import { getRouteEstimate, getPriceBadge, getPriceBadgeLabel, getPriceBadgeColor } from '@/lib/route-estimates'
 import type { MultiCitySearchResult, MultiCitySegmentResult, SearchMode } from '@/types'
 import AlertModal from '@/components/AlertModal'
+import PriceHistoryChart from '@/components/PriceHistoryChart'
 
 interface AISuggestion {
   label: string
@@ -761,6 +762,21 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                                   </div>
                                 </div>
                               </div>
+
+                              {/* Per-segment price history chart */}
+                              {(seg.priceInsights?.priceHistory?.length ?? 0) >= 2 && (
+                                <div className="mt-2">
+                                  <PriceHistoryChart
+                                    priceHistory={seg.priceInsights!.priceHistory!}
+                                    lowestPrice={seg.priceInsights!.lowestPrice}
+                                    priceLevel={seg.priceInsights!.priceLevel}
+                                    estimatedSavings={seg.priceInsights!.estimatedSavings ?? null}
+                                    typicalPriceRange={seg.priceInsights!.typicalPriceRange ?? null}
+                                    origin={seg.origin}
+                                    destination={seg.destination}
+                                  />
+                                </div>
+                              )}
 
                               {/* Toggle for extra flights */}
                               {allFlights.length > 1 && (
