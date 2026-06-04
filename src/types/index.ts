@@ -116,6 +116,7 @@ export interface MultiCitySegmentResult {
   cheapestPrice: number | null
   cheapestFlight: FlightResult | null
   top5Flights: FlightResult[]
+  priceInsights?: PriceInsights | null
 }
 
 export interface MultiCitySearchResult {
