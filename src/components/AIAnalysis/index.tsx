@@ -37,6 +37,7 @@ interface ChatMessage {
 interface Props {
   categorized: CategorizedFlights
   query: SearchQuery
+  mode?: string
   onReSearch: (q: { origin: string; destination: string; departureDate: string; returnDate?: string }) => void
 }
 
@@ -82,7 +83,7 @@ function TypingDots() {
   )
 }
 
-export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
+export default function AIAnalysis({ categorized, query, mode, onReSearch }: Props) {
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -107,7 +108,7 @@ export default function AIAnalysis({ categorized, query, onReSearch }: Props) {
       const res = await fetch('/api/ai-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, categorized }),
+        body: JSON.stringify({ query, categorized, mode }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'AI分析に失敗しました')

@@ -673,6 +673,7 @@ export default function HomePage() {
           <AIAnalysis
             categorized={categorized}
             query={lastQuery}
+            mode={mode}
             onReSearch={(q) => {
               const raw = `${q.origin}から${q.destination} ${q.departureDate}出発${q.returnDate ? ` ${q.returnDate}帰り` : ''}`
               searchBarRef.current?.setQuery(raw)
