@@ -3,7 +3,29 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { Search, Loader2, MapPin, Calendar, Users, Plane } from 'lucide-react'
 import { parseSearchQuery } from '@/lib/parser'
-import type { SearchQuery, ParsedQuery, MultiCityParsedQuery } from '@/types'
+import type { SearchQuery, ParsedQuery, MultiCityParsedQuery, UnifiedQuery } from '@/types'
+
+function unifiedToSearchBarFormat(uq: UnifiedQuery): ParsedQuery | MultiCityParsedQuery {
+  if (uq.type === 'multi-city') {
+    return {
+      type: 'multi-city',
+      segments: uq.legs.map(l => ({ origin: l.origin, destination: l.destination, date: l.date })),
+      passengers: uq.passengers ?? 1,
+      cabinClass: uq.cabinClass ?? 'economy',
+    }
+  }
+  const dep = uq.legs[0]
+  // LLM returns date_role:'departure' for both legs of round-trip; fallback to legs[1]
+  const ret = uq.legs.find(l => l.date_role === 'arrival') ?? (uq.type === 'round-trip' ? uq.legs[1] : undefined)
+  return {
+    origin: dep?.origin ?? null,
+    destination: dep?.destination ?? null,
+    departureDate: dep?.date ?? null,
+    returnDate: ret?.date ?? null,
+    passengers: uq.passengers ?? 1,
+    cabinClass: uq.cabinClass ?? 'economy',
+  }
+}
 
 const PLACEHOLDER_EXAMPLES = [
   '東京からバンコクへ 12月25日 1名',
@@ -119,9 +141,9 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: rawQuery }),
         })
-        const data = await res.json()
+        const data: UnifiedQuery = await res.json()
         lastParsedRawRef.current = rawQuery
-        setParsed(data)
+        setParsed(unifiedToSearchBarFormat(data))
       } finally {
         setIsParsing(false)
       }
@@ -145,9 +167,10 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: rawQuery }),
         })
-        const data = await res.json()
-        setParsed(data)
-        p = data as ParsedQuery | MultiCityParsedQuery
+        const data: UnifiedQuery = await res.json()
+        const converted = unifiedToSearchBarFormat(data)
+        setParsed(converted)
+        p = converted
       } catch {
         // fall through to show error
       } finally {
