@@ -72,6 +72,24 @@ function applyFastestSort(cats: CategorizedFlights): CategorizedFlights {
   }
 }
 
+function applyBalanceSort(cats: CategorizedFlights): CategorizedFlights {
+  return {
+    ...cats,
+    cheapest: sortFlights(cats.cheapest, 'balance'),
+    cheapestDirect: sortFlights(cats.cheapestDirect, 'balance'),
+    recommended: sortFlights(cats.recommended, 'balance'),
+  }
+}
+
+function applyElegantSort(cats: CategorizedFlights): CategorizedFlights {
+  return {
+    ...cats,
+    cheapest: sortFlights(cats.cheapest, 'elegant'),
+    cheapestDirect: sortFlights(cats.cheapestDirect, 'elegant'),
+    recommended: sortFlights(cats.recommended, 'elegant'),
+  }
+}
+
 async function fetchFlights(query: SearchQuery): Promise<CategorizedFlights | null> {
   const res = await fetch('/api/search', {
     method: 'POST',
@@ -241,6 +259,16 @@ export default function HomePage() {
           }
           setMultiCityResult(fastestResult)
           fastestResult.segments.forEach((_, idx) => { selections[idx] = 0 })
+        } else if (newMode === 'balance') {
+          const balanceResult: MultiCitySearchResult = {
+            ...baseMultiCityResult,
+            segments: baseMultiCityResult.segments.map(seg => {
+              const top5 = sortFlights([...(seg.top5Flights ?? [])], 'balance')
+              return { ...seg, top5Flights: top5, cheapestFlight: top5[0] ?? null, cheapestPrice: top5[0]?.totalPrice ?? seg.cheapestPrice }
+            }),
+          }
+          setMultiCityResult(balanceResult)
+          balanceResult.segments.forEach((_, idx) => { selections[idx] = 0 })
         } else {
           // Use reference comparison instead of prevMode to detect if we're
           // currently showing business (elegant) results.
@@ -295,17 +323,21 @@ export default function HomePage() {
       setError('')
       try {
         const results = await fetchFlights({ ...lastQuery, cabinClass: 'business' })
-        setCategorized(results)
+        setCategorized(results ? applyElegantSort(results) : results)
       } catch (err) {
         setError(err instanceof Error ? err.message : '検索に失敗しました')
       } finally {
         setElegantLoading(false)
       }
     } else if (prevMode === 'elegant' && baseCategorized) {
-      setCategorized(newMode === 'fastest' ? applyFastestSort(baseCategorized) : baseCategorized)
+      if (newMode === 'fastest') setCategorized(applyFastestSort(baseCategorized))
+      else if (newMode === 'balance') setCategorized(applyBalanceSort(baseCategorized))
+      else setCategorized(baseCategorized)
     } else if (newMode === 'fastest' && baseCategorized) {
       setCategorized(applyFastestSort(baseCategorized))
-    } else if (prevMode === 'fastest' && baseCategorized) {
+    } else if (newMode === 'balance' && baseCategorized) {
+      setCategorized(applyBalanceSort(baseCategorized))
+    } else if ((prevMode === 'fastest' || prevMode === 'balance') && baseCategorized) {
       setCategorized(baseCategorized)
     }
   }
@@ -507,9 +539,13 @@ export default function HomePage() {
       const results = await fetchFlights(searchQuery)
       if (mode !== 'elegant') {
         setBaseCategorized(results)
-        setCategorized(mode === 'fastest' && results ? applyFastestSort(results) : results)
+        setCategorized(
+          mode === 'fastest' && results ? applyFastestSort(results) :
+          mode === 'balance' && results ? applyBalanceSort(results) :
+          results
+        )
       } else {
-        setCategorized(results)
+        setCategorized(results ? applyElegantSort(results) : results)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '検索に失敗しました')
