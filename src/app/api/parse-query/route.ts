@@ -8,7 +8,44 @@ import {
 } from '@/lib/parser'
 import { resolveFromDB } from '@/lib/airport-db'
 import { IATA_JP_NAMES } from '@/lib/iata-names'
-import type { MultiCityParsedQuery, MultiCitySegmentQuery } from '@/types'
+import type { MultiCityParsedQuery, MultiCitySegmentQuery, ParsedQuery, UnifiedQuery } from '@/types'
+
+// ── Converters to UnifiedQuery ────────────────────────────────────────────────
+
+function toUnified(q: ParsedQuery): UnifiedQuery {
+  const type = q.returnDate ? 'round-trip' : 'one-way'
+  const legs: UnifiedQuery['legs'] = [
+    {
+      origin: q.origin ?? '',
+      destination: q.destination ?? '',
+      date: q.departureDate ?? '',
+      date_role: 'departure',
+    },
+  ]
+  if (q.returnDate) {
+    legs.push({
+      origin: q.destination ?? '',
+      destination: q.origin ?? '',
+      date: q.returnDate,
+      date_role: 'arrival',
+    })
+  }
+  return { type, legs, passengers: q.passengers, cabinClass: q.cabinClass }
+}
+
+function toUnifiedMulti(q: MultiCityParsedQuery): UnifiedQuery {
+  return {
+    type: 'multi-city',
+    legs: q.segments.map(s => ({
+      origin: s.origin,
+      destination: s.destination,
+      date: s.date,
+      date_role: 'departure' as const,
+    })),
+    passengers: q.passengers,
+    cabinClass: q.cabinClass,
+  }
+}
 
 // Inverse lookup: Japanese city name → IATA code, sorted by name length desc
 // so longer names (e.g. "東京 羽田") are matched before shorter prefixes ("東京").
@@ -446,7 +483,7 @@ export async function POST(request: NextRequest) {
 
   // Multi-city takes priority
   const multiCity = tryParseMultiCity(query)
-  if (multiCity) return Response.json(multiCity)
+  if (multiCity) return Response.json(toUnifiedMulti(multiCity))
 
   // Single-city path
   const parsed = parseSearchQuery(query)
@@ -467,5 +504,5 @@ export async function POST(request: NextRequest) {
     if (!parsed.destination) parsed.destination = resolveFromDB(destFrag)   ?? resolveFromDB(query)
   }
 
-  return Response.json(parsed)
+  return Response.json(toUnified(parsed))
 }

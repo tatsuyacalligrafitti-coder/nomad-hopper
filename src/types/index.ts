@@ -1,5 +1,22 @@
 export type SearchMode = 'price' | 'balance' | 'elegant' | 'fastest'
 
+// ── Unified query schema (LLM parser output format) ────────────────────────────
+export type DateRole = 'departure' | 'arrival' | 'deadline'
+
+export interface UnifiedLeg {
+  origin: string       // IATA code
+  destination: string  // IATA code
+  date: string         // ISO 8601 (yyyy-mm-dd)
+  date_role: DateRole
+}
+
+export interface UnifiedQuery {
+  type: 'one-way' | 'round-trip' | 'multi-city'
+  legs: UnifiedLeg[]
+  passengers: number
+  cabinClass: 'economy' | 'premium_economy' | 'business' | 'first'
+}
+
 export interface SearchQuery {
   origin: string
   destination: string
