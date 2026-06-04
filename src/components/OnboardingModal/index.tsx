@@ -7,7 +7,11 @@ import { CHANGELOG } from '@/lib/changelog'
 const STORAGE_KEY = 'tobira_onboarding_shown'
 const LATEST_UPDATE_VERSION = CHANGELOG[0].date
 const UPDATE_STORAGE_KEY = 'tobira_update_seen'
-const TOTAL_PAGES = 7
+
+// Static pages (1–6) + one page per changelog entry (oldest first)
+// CHANGELOG is stored newest-first; reverse for display order
+const CHANGELOG_PAGES = [...CHANGELOG].reverse()
+const TOTAL_PAGES = 6 + CHANGELOG_PAGES.length
 
 type OpenReason = 'initial' | 'update' | 'help' | null
 
@@ -212,7 +216,6 @@ function Page5() {
   )
 }
 
-// Page6 is no longer the final page — CTA button removed, navigation footer handles progression
 function Page6() {
   const roadmap = [
     { icon: '✈️', text: '陸マイラーサポート機能' },
@@ -255,18 +258,16 @@ function formatDateJa(iso: string): string {
   return `${y}年${m}月${d}日`
 }
 
-function Page7({ onClose }: { onClose: () => void }) {
-  const latest = CHANGELOG[0]
-
+function PageChangelog({ entry }: { entry: typeof CHANGELOG_PAGES[number] }) {
   return (
     <div className="space-y-5">
       <div>
         <h2 className="text-xl font-bold text-gray-900">🎉 アップデート情報</h2>
-        <p className="text-xs text-gray-400 mt-1">{formatDateJa(latest.date)}</p>
-        <p className="text-sm font-semibold text-indigo-700 mt-2">{latest.title}</p>
+        <p className="text-xs text-gray-400 mt-1">{formatDateJa(entry.date)}</p>
+        <p className="text-sm font-semibold text-indigo-700 mt-2">{entry.title}</p>
       </div>
       <ul className="space-y-3">
-        {latest.items.map((item) => (
+        {entry.items.map((item) => (
           <li key={item} className="flex items-start gap-2 text-sm text-gray-700">
             <span className="shrink-0 text-green-500">✅</span>
             <span>{item}</span>
@@ -276,13 +277,6 @@ function Page7({ onClose }: { onClose: () => void }) {
       <p className="text-xs text-indigo-500 text-center pt-1">
         今後もアップデートを続けていきます
       </p>
-
-      <button
-        onClick={onClose}
-        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl py-3 text-sm transition-colors"
-      >
-        さあ使ってみる！
-      </button>
     </div>
   )
 }
@@ -298,7 +292,6 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
   const [page, setPage] = useState(0)
   const [openReason, setOpenReason] = useState<OpenReason>(null)
 
-  // Determine initial display on mount
   useEffect(() => {
     const onboardingSeen = !!safeGetStorage(STORAGE_KEY)
     const updateSeen = safeGetStorage(UPDATE_STORAGE_KEY) === LATEST_UPDATE_VERSION
@@ -308,13 +301,12 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
       setOpenReason('initial')
       setIsOpen(true)
     } else if (!updateSeen) {
-      setPage(TOTAL_PAGES - 1) // Jump straight to the update page
+      setPage(TOTAL_PAGES - 1) // Jump to newest update page
       setOpenReason('update')
       setIsOpen(true)
     }
   }, [])
 
-  // forcedOpen: show from page 1 (same as "?" help)
   useEffect(() => {
     if (forcedOpen) {
       setPage(0)
@@ -332,7 +324,6 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
     } else if (openReason === 'update') {
       safeSetStorage(UPDATE_STORAGE_KEY, LATEST_UPDATE_VERSION)
     }
-    // 'help': no localStorage writes
     setIsOpen(false)
     setPage(0)
     setOpenReason(null)
@@ -345,15 +336,17 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
     setIsOpen(true)
   }
 
+  const isLastPage = page === TOTAL_PAGES - 1
+
   return (
     <>
-      {/* Backdrop + modal */}
       {isVisible && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/50"
           onClick={(e) => { if (e.target === e.currentTarget) close() }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 flex flex-col max-h-[90vh]">
+          {/* Modal: fixed height so footer stays anchored regardless of content */}
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 flex flex-col h-[600px] max-h-[90vh]">
             {/* Top bar */}
             <div className="flex items-center justify-between px-5 pt-4 pb-2 shrink-0">
               <span className="text-xs text-gray-400 font-medium">
@@ -368,63 +361,21 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
               </button>
             </div>
 
-            {/* Page content — fixed min-height so modal size stays stable */}
-            <div className="flex-1 overflow-y-auto px-6 py-3 min-h-0 min-h-[420px]">
+            {/* Page content — scrollable within fixed height */}
+            <div className="flex-1 overflow-y-auto px-6 py-3 min-h-0">
               {page === 0 && <Page1 />}
               {page === 1 && <Page2 />}
               {page === 2 && <Page3 />}
               {page === 3 && <Page4 />}
               {page === 4 && <Page5 />}
               {page === 5 && <Page6 />}
-              {page === 6 && <Page7 onClose={close} />}
+              {page >= 6 && <PageChangelog entry={CHANGELOG_PAGES[page - 6]} />}
             </div>
 
-            {/* Navigation footer — shown for all pages except the last */}
-            {page < TOTAL_PAGES - 1 && (
-              <div className="px-6 pb-5 pt-3 shrink-0 space-y-4">
-                {/* Dots */}
-                <div className="flex justify-center gap-1.5">
-                  {Array.from({ length: TOTAL_PAGES }).map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setPage(i)}
-                      className={`rounded-full transition-all ${
-                        i === page
-                          ? 'w-5 h-2 bg-purple-600'
-                          : 'w-2 h-2 bg-gray-200 hover:bg-gray-300'
-                      }`}
-                      aria-label={`${i + 1}ページ目`}
-                    />
-                  ))}
-                </div>
-
-                {/* Prev / Next */}
-                <div className="flex gap-2">
-                  {page > 0 ? (
-                    <button
-                      onClick={() => setPage((p) => p - 1)}
-                      className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 rounded-xl px-4 py-2 transition-colors"
-                    >
-                      <ChevronLeft size={14} />
-                      前へ
-                    </button>
-                  ) : (
-                    <div />
-                  )}
-                  <button
-                    onClick={() => setPage((p) => p + 1)}
-                    className="flex-1 flex items-center justify-center gap-1 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 font-semibold transition-colors"
-                  >
-                    次へ
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Dots only on last page — Page7 has its own CTA button */}
-            {page === TOTAL_PAGES - 1 && (
-              <div className="flex justify-center gap-1.5 pb-3 pt-2 shrink-0">
+            {/* Footer — always the same height, always at the bottom */}
+            <div className="px-6 pb-5 pt-3 shrink-0 space-y-4">
+              {/* Dots */}
+              <div className="flex justify-center gap-1.5">
                 {Array.from({ length: TOTAL_PAGES }).map((_, i) => (
                   <button
                     key={i}
@@ -438,12 +389,44 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
                   />
                 ))}
               </div>
-            )}
+
+              {/* Prev / Next or Close CTA */}
+              <div className="flex gap-2">
+                {page > 0 ? (
+                  <button
+                    onClick={() => setPage((p) => p - 1)}
+                    className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 rounded-xl px-4 py-2 transition-colors"
+                  >
+                    <ChevronLeft size={14} />
+                    前へ
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                {isLastPage ? (
+                  <button
+                    onClick={close}
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl px-4 py-2 text-sm transition-colors"
+                  >
+                    さあ使ってみる！
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setPage((p) => p + 1)}
+                    className="flex-1 flex items-center justify-center gap-1 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 font-semibold transition-colors"
+                  >
+                    次へ
+                    <ChevronRight size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Help button — all devices */}
+      {/* Help button */}
       <button
         onClick={openHelp}
         className="fixed bottom-6 left-6 bg-white border-2 border-indigo-200 rounded-full w-11 h-11 shadow-md flex items-center justify-center text-indigo-400 hover:text-indigo-600 hover:border-indigo-400 hover:shadow-lg transition-all z-40 text-lg"
