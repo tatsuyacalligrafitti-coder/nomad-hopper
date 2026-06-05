@@ -5,6 +5,7 @@ import { DuffelProvider } from './flight-sources/duffel-provider'
 import { SerpAPIProvider } from './flight-sources/serpapi-provider'
 import { TravelpayoutsProvider } from './flight-sources/travelpayouts-provider'
 import { mergeFlights } from './flight-merge'
+import { makeCacheKey, getCached, setCached } from './flight-cache'
 
 // Add AmadeusProvider, KiwiProvider etc. here when API keys are available
 const providers: FlightProvider[] = [
@@ -17,6 +18,21 @@ const providers: FlightProvider[] = [
 export async function searchAllProviders(
   query: SearchQuery,
 ): Promise<{ flights: FlightResult[]; priceInsights?: PriceInsights }> {
+  const cacheKey = makeCacheKey(
+    query.origin,
+    query.destination,
+    query.departureDate,
+    query.passengers,
+    query.cabinClass,
+    query.returnDate,
+  )
+
+  const cached = await getCached(cacheKey)
+  if (cached) {
+    console.log('[orchestrator] cache hit:', cacheKey)
+    return cached
+  }
+
   const settled = await Promise.allSettled(
     providers.map(async (p) => {
       console.log(`[${p.name}] 検索開始`)
@@ -38,5 +54,7 @@ export async function searchAllProviders(
 
   const merged = mergeFlights(groups)
   console.log(`[orchestrator] 合計${merged.length}件`)
-  return { flights: merged.map((f) => f.raw), priceInsights }
+  const result = { flights: merged.map((f) => f.raw), priceInsights }
+  await setCached(cacheKey, result)
+  return result
 }
