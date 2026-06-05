@@ -12,7 +12,15 @@ const rapidHeaders = {
 
 // ─── Pre-populated entity IDs (avoids 2 API calls per segment) ────────────────
 // Verified 2026-05-28 via searchAirport endpoint.
+// City-code aliases: Skyscanner API does not recognize IATA city codes (TYO, OSA, NYC, LON …)
+// as skyIds — it returns a modified city skyId (e.g. "TYOA") instead. Map city codes to their
+// primary airport so lookupEntityId() resolves them from the cache without any API call.
 const KNOWN_ENTITIES: Record<string, { skyId: string; entityId: string }> = {
+  // ── City-code aliases → primary airport ──────────────────────────────────────
+  TYO: { skyId: 'HND', entityId: '128667143' }, // Tokyo → Haneda
+  OSA: { skyId: 'KIX', entityId: '95673965' },  // Osaka → Kansai
+  NYC: { skyId: 'JFK', entityId: '95565058' },  // New York → JFK
+  LON: { skyId: 'LHR', entityId: '95565050' },  // London → Heathrow
   // Japan
   HND: { skyId: 'HND', entityId: '128667143' },
   NRT: { skyId: 'NRT', entityId: '128668889' },
@@ -105,13 +113,24 @@ async function lookupEntityId(
   const json = await res.json() as { data: Array<{
     navigation: {
       entityId: string
+      entityType?: string
       relevantFlightParams: { skyId: string; entityId: string }
     }
   }> }
 
-  const match = (json.data ?? []).find(
+  const items = json.data ?? []
+
+  // 1st priority: exact skyId match (handles real IATA airport codes)
+  let match = items.find(
     (r) => r.navigation?.relevantFlightParams?.skyId === iata,
   )
+
+  // 2nd priority: city code input (e.g. "TYO") — API returns no exact match;
+  // fall back to the first AIRPORT-type result which is the primary airport.
+  if (!match) {
+    match = items.find((r) => r.navigation?.entityType === 'AIRPORT')
+  }
+
   if (!match) return null
 
   const entry = {
