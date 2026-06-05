@@ -3,6 +3,7 @@ import type { FlightProvider } from './flight-sources/base'
 import { RapidAPIProvider } from './flight-sources/rapidapi-provider'
 import { DuffelProvider } from './flight-sources/duffel-provider'
 import { SerpAPIProvider } from './flight-sources/serpapi-provider'
+import { TravelpayoutsProvider } from './flight-sources/travelpayouts-provider'
 import { mergeFlights } from './flight-merge'
 
 // Add AmadeusProvider, KiwiProvider etc. here when API keys are available
@@ -10,6 +11,7 @@ const providers: FlightProvider[] = [
   new RapidAPIProvider(),
   new DuffelProvider(),
   new SerpAPIProvider(),
+  new TravelpayoutsProvider(),
 ]
 
 export async function searchAllProviders(
