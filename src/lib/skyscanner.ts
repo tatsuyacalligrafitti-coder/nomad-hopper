@@ -3,7 +3,14 @@ import { aviasalesLink } from './travelpayouts'
 
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY ?? ''
 const API_HOST = 'sky-scrapper.p.rapidapi.com'
-const BASE = `https://${API_HOST}/api/v1/flights`
+const BASE = `https://${API_HOST}/api/v1/flights`        // searchAirport lives on v1
+const BASE_V2 = `https://${API_HOST}/api/v2/flights`     // searchFlights / searchIncomplete (polling)
+
+// Polling tuning: Skyscanner returns status:"incomplete" on the first call and
+// completes results asynchronously. We poll v2/searchIncomplete with the sessionId
+// until status:"complete" or these limits are hit.
+const MAX_POLLS = 5
+const POLL_INTERVAL_MS = 1500
 
 const rapidHeaders = {
   'x-rapidapi-key': RAPIDAPI_KEY,
@@ -168,10 +175,16 @@ interface SkyItinerary {
 // The API sometimes returns HTTP 200 with a body-level error (e.g.
 // "Something went wrong") when rate-limited. Retry up to maxRetries times
 // with increasing delays to handle both HTTP 429 and body errors.
+interface FetchResult {
+  itineraries: SkyItinerary[]
+  status: string
+  sessionId: string
+}
+
 async function fetchFlights(
   url: string,
   maxRetries = 2,
-): Promise<{ itineraries: SkyItinerary[]; status: string }> {
+): Promise<FetchResult> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (attempt > 0) {
       await new Promise((r) => setTimeout(r, 1500 * attempt))
@@ -192,7 +205,7 @@ async function fetchFlights(
 
     const json = await res.json() as {
       message?: string
-      data?: { context?: { status?: string }; itineraries?: SkyItinerary[] }
+      data?: { context?: { status?: string; sessionId?: string }; itineraries?: SkyItinerary[] }
     }
 
     // Body-level error: HTTP 200 but payload contains an error message instead of data
@@ -204,11 +217,57 @@ async function fetchFlights(
     return {
       itineraries: json.data?.itineraries ?? [],
       status: json.data?.context?.status ?? 'complete',
+      sessionId: json.data?.context?.sessionId ?? '',
     }
   }
 
   console.error('[skyscanner] all retry attempts exhausted')
-  return { itineraries: [], status: 'error' }
+  return { itineraries: [], status: 'error', sessionId: '' }
+}
+
+// ─── Polling: v2/searchIncomplete drives an incomplete search to completion ─────
+// Same itinerary/leg/segment shape as searchFlights, so the existing converter
+// (itineraryToResult) is reused unchanged.
+async function pollIncomplete(sessionId: string): Promise<FetchResult> {
+  const url = `${BASE_V2}/searchIncomplete?sessionId=${encodeURIComponent(sessionId)}&currency=JPY&locale=ja-JP`
+
+  let last: FetchResult = { itineraries: [], status: 'incomplete', sessionId }
+
+  for (let i = 0; i < MAX_POLLS; i++) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
+
+    let res: Response
+    try {
+      res = await fetch(url, { headers: rapidHeaders, cache: 'no-store' })
+    } catch {
+      continue
+    }
+    if (!res.ok) continue
+
+    const json = await res.json() as {
+      message?: string
+      data?: { context?: { status?: string; sessionId?: string }; itineraries?: SkyItinerary[] }
+    }
+    if (json.message && !json.data) {
+      console.warn(`[skyscanner] poll body error "${json.message}" on poll ${i + 1}`)
+      continue
+    }
+
+    const status = json.data?.context?.status ?? 'complete'
+    last = {
+      itineraries: json.data?.itineraries ?? last.itineraries,
+      status,
+      sessionId,
+    }
+
+    if (status === 'complete') {
+      console.log(`[skyscanner] poll complete after ${i + 1} attempt(s), ${last.itineraries.length}件`)
+      return last
+    }
+  }
+
+  console.warn(`[skyscanner] poll limit reached (${MAX_POLLS}), returning ${last.itineraries.length}件 (incomplete)`)
+  return last
 }
 
 // ─── Mapping helpers ───────────────────────────────────────────────────────────
@@ -302,18 +361,19 @@ export async function searchSkyscanner(query: SearchQuery): Promise<FlightResult
 
   if (query.returnDate) params.set('returnDate', query.returnDate)
 
-  const url = `${BASE}/searchFlights?${params}`
+  const url = `${BASE_V2}/searchFlights?${params}`
 
   // First search (with built-in retry for body-level errors)
   const first = await fetchFlights(url)
   let itineraries = first.itineraries
 
-  // Skyscanner often returns "incomplete" on first call; poll once for fuller results
-  if (first.status === 'incomplete') {
-    await new Promise((r) => setTimeout(r, 1500))
-    const second = await fetchFlights(url)
-    if (second.itineraries.length > itineraries.length) {
-      itineraries = second.itineraries
+  // Skyscanner returns "incomplete" on the first call and completes results
+  // asynchronously. Poll v2/searchIncomplete with the sessionId until complete.
+  // (Re-fetching the same searchFlights URL never completes — a sessionId poll is required.)
+  if (first.status === 'incomplete' && first.sessionId) {
+    const polled = await pollIncomplete(first.sessionId)
+    if (polled.itineraries.length > itineraries.length) {
+      itineraries = polled.itineraries
     }
   }
 
