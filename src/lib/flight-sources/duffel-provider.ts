@@ -94,6 +94,14 @@ export class DuffelProvider implements FlightProvider {
       return []
     }
 
+    // Test-environment keys return mock data (fake carriers, ¥80-200 fares) that
+    // pollutes real results. Skip until a live key (duffel_live_) is configured —
+    // swapping the env var re-enables this provider with no code change.
+    if (apiKey.startsWith('duffel_test_')) {
+      console.log('[duffel] test key detected, skipping (set duffel_live_ key to enable)')
+      return []
+    }
+
     const passengers = Array.from(
       { length: query.passengers },
       () => ({ type: 'adult' as const }),
