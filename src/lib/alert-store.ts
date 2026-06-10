@@ -105,3 +105,55 @@ export async function deleteAlert(alertId: string): Promise<void> {
     console.error('[alert-store] delete error:', err instanceof Error ? err.message : String(err))
   }
 }
+
+// ─── Price history (one observed cheapest price per route+date, per day) ─────────
+export interface PricePoint {
+  date: string  // YYYY-MM-DD
+  price: number
+}
+
+const PRICEHIST_KEY = (origin: string, destination: string, departureDate: string) =>
+  `pricehist:${origin}-${destination}-${departureDate}`
+
+export async function recordPriceHistory(
+  origin: string,
+  destination: string,
+  departureDate: string,
+  price: number,
+  timestamp: string,
+): Promise<void> {
+  const redis = getRedis()
+  if (!redis) {
+    console.warn('[alert-store] Redis未設定、価格履歴記録をスキップ')
+    return
+  }
+
+  const date = timestamp.slice(0, 10) // YYYY-MM-DD
+  const key = PRICEHIST_KEY(origin, destination, departureDate)
+
+  try {
+    const existing = (await redis.get<PricePoint[]>(key)) ?? []
+    // One sample per day: overwrite same-day entry, otherwise append.
+    const filtered = existing.filter((p) => p.date !== date)
+    filtered.push({ date, price })
+    await redis.set(key, filtered)
+    console.log('[alert-store] price recorded:', key, `¥${price.toLocaleString()}`)
+  } catch (err) {
+    console.error('[alert-store] price history error:', err instanceof Error ? err.message : String(err))
+  }
+}
+
+export async function getPriceHistory(
+  origin: string,
+  destination: string,
+  departureDate: string,
+): Promise<PricePoint[]> {
+  const redis = getRedis()
+  if (!redis) return []
+  try {
+    return (await redis.get<PricePoint[]>(PRICEHIST_KEY(origin, destination, departureDate))) ?? []
+  } catch (err) {
+    console.error('[alert-store] get price history error:', err instanceof Error ? err.message : String(err))
+    return []
+  }
+}
