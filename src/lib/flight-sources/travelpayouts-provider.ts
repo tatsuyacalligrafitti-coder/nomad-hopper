@@ -8,6 +8,7 @@ interface V1Entry {
   price: number
   flight_number: number
   departure_at: string
+  return_at?: string
   duration_to?: number
   duration?: number
 }
@@ -25,10 +26,13 @@ export class TravelpayoutsProvider implements FlightProvider {
     const params = new URLSearchParams({
       origin: query.origin,
       destination: query.destination,
-      depart_date: query.departureDate.slice(0, 7), // YYYY-MM
+      depart_date: query.departureDate, // YYYY-MM-DD（日単位で正確な日を要求）
       currency: 'jpy',
       limit: '10',
     })
+    if (query.returnDate) {
+      params.set('return_date', query.returnDate) // YYYY-MM-DD
+    }
 
     const res = await fetch(
       `https://api.travelpayouts.com/v1/prices/cheap?${params}`,
@@ -54,13 +58,31 @@ export class TravelpayoutsProvider implements FlightProvider {
     }
 
     const results: NormalizedFlight[] = []
+    let filteredCount = 0
 
     for (const [destCode, bucket] of Object.entries(json.data)) {
       for (const [transferKey, entry] of Object.entries(bucket)) {
         const stops = parseInt(transferKey, 10)
         const durationMinutes = entry.duration_to ?? entry.duration ?? 0
-        const departureDate = entry.departure_at?.split('T')[0] ?? query.departureDate
+        const departureDate = entry.departure_at?.split('T')[0]
         const flightNumber = `${entry.airline}${entry.flight_number}`
+
+        // v1/prices/cheap は depart_date=YYYY-MM のため、期間内の任意日の
+        // キャッシュ最安値を返しうる。リクエストした出発日と一致しない便は
+        // 除外する（データなしは非表示の原則）。
+        if (departureDate !== query.departureDate) {
+          filteredCount++
+          continue
+        }
+
+        // 復路日が指定されており、レスポンスに復路日情報がある場合のみ検証する。
+        if (query.returnDate && entry.return_at) {
+          const returnDate = entry.return_at.split('T')[0]
+          if (returnDate !== query.returnDate) {
+            filteredCount++
+            continue
+          }
+        }
 
         results.push({
           origin: query.origin,
@@ -102,6 +124,9 @@ export class TravelpayoutsProvider implements FlightProvider {
       }
     }
 
+    if (filteredCount > 0) {
+      console.log(`[travelpayouts] filtered ${filteredCount} flights with mismatched dates`)
+    }
     console.log(`[travelpayouts] ${results.length}件取得`)
     return results
   }
