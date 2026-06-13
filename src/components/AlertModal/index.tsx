@@ -17,8 +17,9 @@ export default function AlertModal({ flight, onClose, prefilledLineUserId, prefi
   const [method, setMethod] = useState<NotifyMethod>(prefilledLineUserId ? 'line' : 'email')
   const [email, setEmail] = useState('')
   const [lineUserId, setLineUserId] = useState(prefilledLineUserId ?? '')
+  // 入力中は文字列で保持し、空文字を許容する（全削除で 0 が残るのを防ぐ）。
   const [targetPrice, setTargetPrice] = useState(
-    Math.floor(flight.totalPrice * 0.9)
+    String(Math.floor(flight.totalPrice * 0.9))
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -46,6 +47,11 @@ export default function AlertModal({ flight, onClose, prefilledLineUserId, prefi
       setError('LINEでログインしてIDを取得してください')
       return
     }
+    const priceNum = Number(targetPrice)
+    if (!targetPrice || !Number.isFinite(priceNum) || priceNum <= 0) {
+      setError('目標価格は1円以上で入力してください')
+      return
+    }
 
     setIsSubmitting(true)
     try {
@@ -56,7 +62,7 @@ export default function AlertModal({ flight, onClose, prefilledLineUserId, prefi
           email: method === 'email' ? email : undefined,
           lineUserId: method === 'line' ? lineUserId : undefined,
           flightId: flight.id,
-          targetPrice,
+          targetPrice: priceNum,
           currentPrice: Math.round(flight.totalPrice),
           origin: firstSeg.origin,
           destination: lastSeg.destination,
@@ -98,7 +104,7 @@ export default function AlertModal({ flight, onClose, prefilledLineUserId, prefi
             <CheckCircle className="mx-auto text-green-500 mb-3" size={48} />
             <p className="font-bold text-gray-800">アラートを設定しました</p>
             <p className="text-sm text-gray-500 mt-1">
-              ¥{targetPrice.toLocaleString()} を下回ったら通知します
+              ¥{Number(targetPrice).toLocaleString()} を下回ったら通知します
             </p>
             <button
               onClick={onClose}
@@ -126,8 +132,13 @@ export default function AlertModal({ flight, onClose, prefilledLineUserId, prefi
               </label>
               <input
                 type="number"
+                inputMode="numeric"
                 value={targetPrice}
-                onChange={(e) => setTargetPrice(Number(e.target.value))}
+                onChange={(e) => {
+                  // 空文字は許容、先頭ゼロは正規化（"099999" → "99999"）
+                  const v = e.target.value
+                  setTargetPrice(v === '' ? '' : v.replace(/^0+(?=\d)/, ''))
+                }}
                 min={1}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />

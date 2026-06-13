@@ -1,5 +1,6 @@
 import type { SearchQuery } from '@/types'
 import { aviasalesLink } from '@/lib/travelpayouts'
+import { airlineName } from '@/lib/airline-names'
 import type { FlightProvider } from './base'
 import type { NormalizedFlight } from './types'
 
@@ -66,6 +67,7 @@ export class TravelpayoutsProvider implements FlightProvider {
         const durationMinutes = entry.duration_to ?? entry.duration ?? 0
         const departureDate = entry.departure_at?.split('T')[0]
         const flightNumber = `${entry.airline}${entry.flight_number}`
+        const carrierDisplayName = airlineName(entry.airline)
 
         // v1/prices/cheap は depart_date=YYYY-MM のため、期間内の任意日の
         // キャッシュ最安値を返しうる。リクエストした出発日と一致しない便は
@@ -88,7 +90,7 @@ export class TravelpayoutsProvider implements FlightProvider {
           origin: query.origin,
           destination: destCode,
           departureDate,
-          airline: entry.airline,
+          airline: carrierDisplayName,
           flightNumber,
           price: entry.price,
           currency: 'JPY',
@@ -109,7 +111,7 @@ export class TravelpayoutsProvider implements FlightProvider {
                 departingAt: entry.departure_at,
                 arrivingAt: entry.departure_at,
                 carrierCode: entry.airline,
-                carrierName: entry.airline,
+                carrierName: carrierDisplayName,
                 flightNumber,
                 duration: durationMinutes,
                 stops,
