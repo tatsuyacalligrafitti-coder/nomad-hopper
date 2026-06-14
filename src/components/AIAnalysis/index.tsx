@@ -19,6 +19,7 @@ interface AnalysisResult {
   keyInsight?: string
   seasonalTags?: string[]
   seasonalDetail?: string
+  chatStarters?: string[]
 }
 
 interface SearchSuggestion {
@@ -301,7 +302,7 @@ export default function AIAnalysis({ categorized, query, mode, onReSearch }: Pro
 
             {chatMessages.length === 0 && (
               <div className="grid grid-cols-2 gap-2">
-                {CHAT_SUGGESTIONS.map((s) => (
+                {(result.chatStarters?.length ? result.chatStarters : CHAT_SUGGESTIONS).map((s) => (
                   <button
                     key={s}
                     onClick={() => sendChat(s)}
