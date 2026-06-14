@@ -16,6 +16,9 @@ interface AnalysisResult {
   recommended: string
   caution: string | null
   suggestions?: AISuggestion[]
+  keyInsight?: string
+  seasonalTags?: string[]
+  seasonalDetail?: string
 }
 
 interface SearchSuggestion {
@@ -92,6 +95,7 @@ export default function AIAnalysis({ categorized, query, mode, onReSearch }: Pro
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [hasReSearched, setHasReSearched] = useState(false)
+  const [seasonOpen, setSeasonOpen] = useState(false)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -104,6 +108,7 @@ export default function AIAnalysis({ categorized, query, mode, onReSearch }: Pro
     setLoading(true)
     setError('')
     setChatMessages([])
+    setSeasonOpen(false)
     try {
       const res = await fetch('/api/ai-analysis', {
         method: 'POST',
@@ -216,15 +221,54 @@ export default function AIAnalysis({ categorized, query, mode, onReSearch }: Pro
             <span className={`text-lg font-extrabold ${verdictStyle.textColor}`}>{result.verdict}</span>
           </div>
 
+          {result.keyInsight && (
+            <p className="flex items-start gap-1.5 text-sm font-bold text-indigo-800 leading-snug">
+              <span className="shrink-0">💡</span>
+              <span>{result.keyInsight}</span>
+            </p>
+          )}
+
           <div className="space-y-1">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">判断理由</p>
             <p className="text-sm text-gray-700 leading-relaxed">{result.reason}</p>
           </div>
 
+          {result.seasonalTags && result.seasonalTags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {result.seasonalTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-3 py-1 text-xs font-medium"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
           <div className="space-y-1">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">✈️ おすすめの便</p>
             <p className="text-sm text-gray-700 leading-relaxed">{result.recommended}</p>
           </div>
+
+          {result.seasonalDetail && (
+            <div className="space-y-2">
+              <button
+                onClick={() => setSeasonOpen((o) => !o)}
+                className="inline-flex items-center gap-1.5 border border-indigo-300 bg-indigo-100 rounded-lg px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-200 transition-colors"
+              >
+                <span>📅 なぜこの時期がこの価格？</span>
+                <span className="text-[10px]">{seasonOpen ? '▲' : '▼'}</span>
+              </button>
+              {seasonOpen && (
+                <div className="rounded-xl border border-indigo-100 bg-white px-3 py-3">
+                  <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
+                    {result.seasonalDetail}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {result.caution && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">

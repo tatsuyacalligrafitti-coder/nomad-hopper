@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import type { CategorizedFlights, PriceInsights, SearchQuery } from '@/types'
+import { generateSeasonality } from '@/lib/seasonality'
 
 const MODE_INSTRUCTIONS: Record<string, string> = {
   price: `ユーザーは最安値を最優先しています。価格の安さを軸に便を評価し、乗継時間が長くても安ければその価値を正直に伝えてください。verdictも「最安値を今すぐ押さえる価値がある」視点で。`,
@@ -161,54 +162,80 @@ export async function POST(request: NextRequest) {
     'この中でどの便が最適かアドバイスしてください。',
   ].filter(l => l !== null).join('\n')
 
-  const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1500,
-      system: buildSystemPrompt(mode),
-      messages: [{ role: 'user', content: userMessage }],
-    }),
-  })
+  // 価格分析（verdict等の生成）。Promise.all で季節生成と並列実行するため関数化。
+  type AnalysisOutcome =
+    | { ok: true; parsed: Record<string, unknown>; suggestions: unknown[] }
+    | { ok: false; status: number; error: string }
 
-  if (!claudeRes.ok) {
-    const err = await claudeRes.json().catch(() => ({}))
-    return Response.json(
-      { error: (err as { error?: { message?: string } }).error?.message ?? 'Claude API error' },
-      { status: 500 }
-    )
-  }
+  const runPriceAnalysis = async (): Promise<AnalysisOutcome> => {
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1500,
+        system: buildSystemPrompt(mode),
+        messages: [{ role: 'user', content: userMessage }],
+      }),
+    })
 
-  const claudeData = await claudeRes.json()
-  const text: string = claudeData.content?.[0]?.text ?? ''
-  console.log('[ai-analysis] raw response:', text)
-
-  // Strip markdown code fences if Claude wraps the JSON
-  const cleaned = text.replace(/^```(?:json)?\s*/m, '').replace(/```\s*$/m, '').trim()
-
-  let parsed: Record<string, unknown>
-  try {
-    parsed = JSON.parse(cleaned)
-  } catch {
-    // Fallback: extract first {...} block
-    const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      return Response.json({ error: 'AI分析の解析に失敗しました' }, { status: 500 })
+    if (!claudeRes.ok) {
+      const err = await claudeRes.json().catch(() => ({}))
+      return {
+        ok: false,
+        status: 500,
+        error: (err as { error?: { message?: string } }).error?.message ?? 'Claude API error',
+      }
     }
+
+    const claudeData = await claudeRes.json()
+    const text: string = claudeData.content?.[0]?.text ?? ''
+    console.log('[ai-analysis] raw response:', text)
+
+    // Strip markdown code fences if Claude wraps the JSON
+    const cleaned = text.replace(/^```(?:json)?\s*/m, '').replace(/```\s*$/m, '').trim()
+
+    let parsed: Record<string, unknown>
     try {
-      parsed = JSON.parse(jsonMatch[0])
+      parsed = JSON.parse(cleaned)
     } catch {
-      return Response.json({ error: 'AI分析の解析に失敗しました' }, { status: 500 })
+      // Fallback: extract first {...} block
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) {
+        return { ok: false, status: 500, error: 'AI分析の解析に失敗しました' }
+      }
+      try {
+        parsed = JSON.parse(jsonMatch[0])
+      } catch {
+        return { ok: false, status: 500, error: 'AI分析の解析に失敗しました' }
+      }
     }
+
+    const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : []
+    console.log('[ai-analysis] suggestions parsed:', suggestions)
+    return { ok: true, parsed, suggestions }
   }
 
-  const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : []
-  console.log('[ai-analysis] suggestions parsed:', suggestions)
+  // 価格分析と季節データ生成を並列実行。季節生成は内部で例外を握りつぶし
+  // 空オブジェクトを返すため、失敗しても価格分析結果はそのまま返る（グレースフル）。
+  const [analysis, seasonality] = await Promise.all([
+    runPriceAnalysis(),
+    generateSeasonality(query.origin, query.destination, query.departureDate, query.returnDate),
+  ])
 
-  return Response.json({ ...parsed, suggestions })
+  if (!analysis.ok) {
+    return Response.json({ error: analysis.error }, { status: analysis.status })
+  }
+
+  return Response.json({
+    ...analysis.parsed,
+    suggestions: analysis.suggestions,
+    keyInsight: seasonality.keyInsight,
+    seasonalTags: seasonality.seasonalTags,
+    seasonalDetail: seasonality.seasonalDetail,
+  })
 }
