@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import type { CategorizedFlights, SearchQuery } from '@/types'
+import type { CategorizedFlights, PriceInsights, SearchQuery } from '@/types'
 
 const MODE_INSTRUCTIONS: Record<string, string> = {
   price: `ユーザーは最安値を最優先しています。価格の安さを軸に便を評価し、乗継時間が長くても安ければその価値を正直に伝えてください。verdictも「最安値を今すぐ押さえる価値がある」視点で。`,
@@ -13,7 +13,7 @@ function buildSystemPrompt(mode?: string): string {
   const modeInstruction = MODE_INSTRUCTIONS[mode ?? 'price'] ?? MODE_INSTRUCTIONS.price
   return `今日の日付は${today}です。
 
-あなたは航空券の便選びアドバイザーです。相場水準の判断はグラフに任せます。ここでは表示されている便の中から、ユーザーの目的（最安・乗り継ぎ回数・航空会社の信頼性・快適さ等）に合わせてどの便が最適かをアドバイスしてください。以下のJSON形式のみで回答してください。前置き・後書き・コードブロック記号は不要です。JSONだけを出力してください。
+あなたは航空券のアドバイザーです。表示されている便の中からユーザーの目的（最安・乗り継ぎ回数・航空会社の信頼性・快適さ等）に合う最適な便を選ぶと同時に、相場コンテキスト（この路線の価格推移・通常価格帯・トレンド）が与えられた場合は、それを踏まえて「今買うべきか・待つべきか」を判断してください。以下のJSON形式のみで回答してください。前置き・後書き・コードブロック記号は不要です。JSONだけを出力してください。
 
 {
   "verdict": "◎今すぐ",
@@ -26,12 +26,67 @@ function buildSystemPrompt(mode?: string): string {
 }
 
 ルール：
-- verdictは必ず「◎今すぐ」「△様子見」「✗待つべき」のいずれか。根拠は「この便の選択の観点」で判断すること（例: 最安便が他より大幅に安く今選ぶ価値がある → ◎今すぐ）
+- verdictは必ず「◎今すぐ」「△様子見」「✗待つべき」のいずれか。
+- 相場コンテキストが与えられた場合、reason（判断理由）には相場の根拠（通常価格帯の中での位置、過去2ヶ月の推移レンジ、直近トレンド）と時間軸（出発までの日数）の両面を織り込み、「なぜ今買うべきか/待つべきか」を具体的に述べること。例: 現在価格が通常価格帯の下限付近で直近が上昇傾向なら「◎今すぐ」、上限付近で下降傾向かつ出発まで日数があるなら「✗待つべき」、中間水準なら「△様子見」など。
+- 相場コンテキストが無い場合は、表示されている便の価格分布（最安・最高）から相対的に判断すること。
 - suggestionsは必ず1〜3件含めること（同区間の別航空会社・直行便の有無・乗り継ぎ時間・預け荷物の有無など便選びに関する質問）
-- 相場が高いか安いかの繰り返しはしない。便の比較・選択に集中すること
+- reasonは2〜3文に収め、相場の数値を冗長に繰り返さず、便選びの実用性も維持すること
 
 【現在のユーザー優先モード】
 ${modeInstruction}`
+}
+
+// priceInsights（路線全体の価格推移・相場水準）を日本語の短いコンテキスト文に整形する。
+// 算出ロジックは PriceHistoryChart のコメント生成に準拠。
+function buildMarketContext(pi: PriceInsights, departureDate?: string): string | null {
+  const lines: string[] = []
+
+  // 通常価格帯と、現在最安値のその中での位置
+  if (pi.typicalPriceRange) {
+    const [low, high] = pi.typicalPriceRange
+    lines.push(`通常価格帯: ¥${Math.round(low).toLocaleString()}〜¥${Math.round(high).toLocaleString()}`)
+    if (high > low) {
+      const ratio = (pi.lowestPrice - low) / (high - low)
+      const position =
+        ratio <= 0.25 ? '下限付近（お得な水準）' :
+        ratio <= 0.5  ? '中間より安い水準' :
+        ratio <= 0.75 ? '中間より高い水準' :
+                        '上限に近いやや高めの水準'
+      lines.push(`現在の最安値¥${Math.round(pi.lowestPrice).toLocaleString()}は通常価格帯の${position}`)
+    }
+  }
+
+  // priceLevel（相場評価）
+  const levelLabel: Record<string, string> = { low: '安い', typical: '標準', high: '高い' }
+  const lvl = levelLabel[pi.priceLevel] ?? pi.priceLevel
+  if (lvl) lines.push(`相場評価: ${lvl}`)
+
+  // 過去2ヶ月の推移レンジ + 直近トレンド
+  if (pi.priceHistory && pi.priceHistory.length > 0) {
+    const prices = pi.priceHistory.map(p => p.price)
+    const histMin = Math.round(Math.min(...prices)).toLocaleString()
+    const histMax = Math.round(Math.max(...prices)).toLocaleString()
+    lines.push(`過去2ヶ月の推移レンジ: ¥${histMin}〜¥${histMax}`)
+    if (pi.priceHistory.length >= 14) {
+      const recentAvg = pi.priceHistory.slice(-7).reduce((a, b) => a + b.price, 0) / 7
+      const prevAvg = pi.priceHistory.slice(-14, -7).reduce((a, b) => a + b.price, 0) / 7
+      const diff = (recentAvg - prevAvg) / prevAvg
+      const trend = diff > 0.03 ? '直近はやや上昇傾向' : diff < -0.03 ? '直近はやや下降傾向' : '直近は横ばい傾向'
+      lines.push(`トレンド: ${trend}`)
+    }
+  }
+
+  // 出発までの日数（時間軸の判断材料）
+  if (departureDate) {
+    const dep = new Date(departureDate)
+    if (!Number.isNaN(dep.getTime())) {
+      const days = Math.ceil((dep.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      if (days >= 0) lines.push(`出発まで約${days}日`)
+    }
+  }
+
+  if (lines.length === 0) return null
+  return lines.map(l => `- ${l}`).join('\n')
 }
 
 
@@ -83,6 +138,10 @@ export async function POST(request: NextRequest) {
 
   const cabinLabel = query.cabinClass === 'business' ? 'ビジネスクラス' : 'エコノミー'
 
+  const marketContext = categorized.priceInsights
+    ? buildMarketContext(categorized.priceInsights, query.departureDate)
+    : null
+
   const userMessage = [
     `出発地: ${query.origin}`,
     `目的地: ${query.destination}`,
@@ -95,6 +154,9 @@ export async function POST(request: NextRequest) {
     '',
     `最安値: ¥${minPrice}`,
     `最高値: ¥${maxPrice}`,
+    ...(marketContext
+      ? ['', '相場コンテキスト（この路線全体の価格推移・相場水準）:', marketContext]
+      : []),
     '',
     'この中でどの便が最適かアドバイスしてください。',
   ].filter(l => l !== null).join('\n')
