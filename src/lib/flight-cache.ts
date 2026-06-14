@@ -8,7 +8,7 @@ export interface CachedSearchResult {
   priceInsights?: PriceInsights
 }
 
-function getRedis(): Redis | null {
+export function getRedis(): Redis | null {
   if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) return null
   try {
     return Redis.fromEnv()
