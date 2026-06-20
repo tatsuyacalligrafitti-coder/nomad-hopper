@@ -26,8 +26,43 @@ interface Props {
   onClose: () => void
 }
 
-function googleFlightsUrl(origin: string, destination: string): string {
-  return `https://www.google.com/travel/flights?q=flights+${origin}+to+${destination}`
+function encodeTfsRoundTrip(
+  origin: string, destination: string,
+  departureDate: string, returnDate: string, // 'YYYY-MM-DD'
+): string {
+  const enc = new TextEncoder();
+  const leg = (date: string, from: string, to: string): number[] => {
+    const d = Array.from(enc.encode(date));
+    const f = Array.from(enc.encode(from));
+    const t = Array.from(enc.encode(to));
+    const body = [
+      0x12, 0x0a, ...d,
+      0x6a, 0x07, 0x08, 0x01, 0x12, 0x03, ...f,
+      0x72, 0x07, 0x08, 0x01, 0x12, 0x03, ...t,
+    ];
+    return [0x1a, body.length, ...body];
+  };
+  const bytes = [
+    0x08, 0x1c, 0x10, 0x02,
+    ...leg(departureDate, origin, destination),
+    ...leg(returnDate, destination, origin),
+    0x42, 0x01, 0x01, 0x48, 0x01, 0x70, 0x01,
+    0x98, 0x01, 0x01, 0xc8, 0x01, 0x01,
+  ];
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function googleFlightsUrl(
+  origin: string, destination: string,
+  departureDate?: string, returnDate?: string,
+): string {
+  if (departureDate && returnDate) {
+    const tfs = encodeTfsRoundTrip(origin, destination, departureDate, returnDate);
+    return `https://www.google.com/travel/flights?tfs=${tfs}&hl=ja&curr=JPY`;
+  }
+  return `https://www.google.com/travel/flights?q=flights+${origin}+to+${destination}`;
 }
 
 // post_data は "u=<encoded_string>" 形式の単一パラメータ。
@@ -91,7 +126,12 @@ export default function BookingOptionsPanel({ flight, query, onClose }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const fallbackUrl = googleFlightsUrl(query.origin, query.destination)
+  const fallbackUrl = googleFlightsUrl(
+    query.origin,
+    query.destination,
+    query.outboundDate,
+    query.returnDate ?? undefined,
+  )
 
   return (
     <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 mt-1">
