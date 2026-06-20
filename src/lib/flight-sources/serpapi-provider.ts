@@ -85,6 +85,7 @@ function groupToFlightResult(
       last?.arrival_airport.id ?? query.destination,
       query.departureDate,
       query.passengers,
+      query.returnDate,
     ),
     ...(group.booking_token   ? { serpBookingToken:   group.booking_token   } : {}),
     ...(group.departure_token ? { serpDepartureToken: group.departure_token } : {}),

@@ -318,6 +318,7 @@ function itineraryToResult(
       query.destination,
       query.departureDate,
       query.passengers,
+      query.returnDate,
     ),
   }
 }

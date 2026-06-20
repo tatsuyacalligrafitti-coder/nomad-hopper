@@ -79,6 +79,7 @@ function offerToFlightResult(offer: DuffelOffer, query: SearchQuery): FlightResu
       query.destination,
       query.departureDate,
       query.passengers,
+      query.returnDate,
     ),
   }
 }
