@@ -97,8 +97,9 @@ export default function PriceHistoryChart({ priceHistory, lowestPrice, priceLeve
               💰 今予約すると約¥{estimatedSavings.toLocaleString()}お得
             </p>
           )}
-          {/* 評価ピルはグラフSVGの外（上部）に固定配置し、折れ線との重なりを構造的に排除する */}
-          <div className="mb-2">
+          {/* 評価ピルはグラフSVGの外（上部）に固定配置し、折れ線との重なりを構造的に排除する。
+              現在価格＝右端（最新地点）の情報なので、金融チャート同様に右寄せにする */}
+          <div className="mb-2 flex justify-end">
             <span
               className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold text-white"
               style={{ backgroundColor: refColor }}
