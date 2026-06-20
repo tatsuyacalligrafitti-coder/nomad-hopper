@@ -8,9 +8,16 @@ export function aviasalesLink(
   destination: string,
   departureDate: string,
   passengers = 1,
+  returnDate?: string,
 ): string {
   const [, mm, dd] = departureDate.split('-')
-  return `https://www.aviasales.com/search/${origin}${dd}${mm}${destination}${passengers}?marker=731864`
+  let path = `${origin}${dd}${mm}${destination}`
+  if (returnDate) {
+    const [, rmm, rdd] = returnDate.split('-')
+    path += `${rdd}${rmm}`
+  }
+  path += `${passengers}`
+  return `https://www.aviasales.com/search/${path}?marker=731864`
 }
 
 // ─── v1/prices/cheap ──────────────────────────────────────────────────────────
@@ -80,7 +87,7 @@ async function fetchV1(query: SearchQuery): Promise<FlightResult[]> {
         cabinClass: 'economy',
         stops,
         baggageIncluded: false,
-        bookingLink: aviasalesLink(query.origin, destCode, query.departureDate, query.passengers),
+        bookingLink: aviasalesLink(query.origin, destCode, query.departureDate, query.passengers, query.returnDate),
       })
     }
   }
@@ -151,7 +158,7 @@ async function fetchV2(query: SearchQuery): Promise<FlightResult[]> {
       stops,
       baggageIncluded: false,
       // Use the query's airport code for the affiliate link (v2 uses city code "TYO")
-      bookingLink: aviasalesLink(query.origin, query.destination, entry.depart_date, query.passengers),
+      bookingLink: aviasalesLink(query.origin, query.destination, entry.depart_date, query.passengers, query.returnDate),
     }
   })
 }

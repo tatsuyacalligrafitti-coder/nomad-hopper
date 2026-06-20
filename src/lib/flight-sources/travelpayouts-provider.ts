@@ -120,7 +120,7 @@ export class TravelpayoutsProvider implements FlightProvider {
             cabinClass: query.cabinClass,
             stops,
             baggageIncluded: false,
-            bookingLink: aviasalesLink(query.origin, destCode, departureDate, query.passengers),
+            bookingLink: aviasalesLink(query.origin, destCode, departureDate, query.passengers, query.returnDate),
           },
         })
       }
