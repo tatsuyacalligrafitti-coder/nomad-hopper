@@ -5,48 +5,6 @@ import { format, parseISO } from 'date-fns'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot, ResponsiveContainer } from 'recharts'
 import { IATA_JP_NAMES } from '@/lib/iata-names'
 
-// 基準線ラベル。テキストの背後に評価色の角丸ピルを敷き、白文字で線の上でもくっきり読めるようにする。
-// recharts が viewBox（基準線の x / y / width）を注入する。
-function RefLabel(props: {
-  viewBox?: { x?: number; y?: number; width?: number; height?: number }
-  text: string
-  color: string
-}) {
-  const { viewBox, text, color } = props
-  if (!viewBox || viewBox.x == null || viewBox.y == null || viewBox.width == null) return null
-  const { x, y, width } = viewBox as { x: number; y: number; width: number }
-  const fontSize = 11
-  const padX = 7
-  const padY = 4
-  // 全角は約 fontSize、半角は約 0.6em で文字幅を概算
-  const textW = [...text].reduce((w, ch) => w + (ch.charCodeAt(0) > 0x2e80 ? fontSize : fontSize * 0.6), 0)
-  const pillW = textW + padX * 2
-  const pillH = fontSize + padY * 2
-  // 左寄せ。グラフ右端からはみ出さないよう clamp
-  let pillX = x + 4
-  if (pillX + pillW > x + width) pillX = x + width - pillW - 2
-  if (pillX < x + 2) pillX = x + 2
-  // 基本は線の上。上にはみ出す（線がグラフ上端付近）場合は線の下に逃がす
-  let pillY = y - pillH - 5
-  if (pillY < 2) pillY = y + 5
-  return (
-    <g>
-      <rect x={pillX} y={pillY} width={pillW} height={pillH} rx={4} fill={color} opacity={0.95} />
-      <text
-        x={pillX + pillW / 2}
-        y={pillY + pillH / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={fontSize}
-        fontWeight={600}
-        fill="#ffffff"
-      >
-        {text}
-      </text>
-    </g>
-  )
-}
-
 interface Props {
   priceHistory: { price: number; date: string }[]
   lowestPrice: number
@@ -139,6 +97,15 @@ export default function PriceHistoryChart({ priceHistory, lowestPrice, priceLeve
               💰 今予約すると約¥{estimatedSavings.toLocaleString()}お得
             </p>
           )}
+          {/* 評価ピルはグラフSVGの外（上部）に固定配置し、折れ線との重なりを構造的に排除する */}
+          <div className="mb-2">
+            <span
+              className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold text-white"
+              style={{ backgroundColor: refColor }}
+            >
+              {refLabel}
+            </span>
+          </div>
           <ResponsiveContainer width="100%" height={160}>
             <LineChart data={priceHistory} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
@@ -166,7 +133,6 @@ export default function PriceHistoryChart({ priceHistory, lowestPrice, priceLeve
                 stroke={refColor}
                 strokeWidth={2}
                 strokeDasharray="5 4"
-                label={<RefLabel text={refLabel} color={refColor} />}
               />
               {lastDate && (
                 <ReferenceDot
