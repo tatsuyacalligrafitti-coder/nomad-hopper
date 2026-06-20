@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot, ResponsiveContainer } from 'recharts'
 import { IATA_JP_NAMES } from '@/lib/iata-names'
 
 interface Props {
@@ -19,6 +19,34 @@ export default function PriceHistoryChart({ priceHistory, lowestPrice, priceLeve
   const [open, setOpen] = useState(false)
   const lineColor = priceLevel === 'low' ? '#16a34a' : priceLevel === 'high' ? '#dc2626' : '#6366f1'
 
+  // 相場での位置評価。typicalPriceRange 内の ratio に一本化し、基準線ラベルと説明文で共有して評価軸の矛盾をなくす。
+  const evaluation = (() => {
+    if (!typicalPriceRange) return null
+    const [low, high] = typicalPriceRange
+    if (high <= low) return null
+    const ratio = (lowestPrice - low) / (high - low)
+    // 色・評価語は 3 段階（お得/標準/割高）
+    const tier =
+      ratio <= 0.33 ? { word: 'お得', color: '#16a34a' } :
+      ratio <= 0.66 ? { word: '標準', color: '#6366f1' } :
+                      { word: '割高', color: '#dc2626' }
+    // 位置表現は既存の 4 段階を流用
+    const position =
+      ratio <= 0.25 ? '下限付近' :
+      ratio <= 0.5  ? '中間より安い' :
+      ratio <= 0.75 ? '中間より高い' :
+                      '上限付近'
+    return { ratio, position, low, high, ...tier }
+  })()
+
+  // 基準線（現在最安値）の色とラベル文言。レンジが無い場合は金額のみ・インディゴにフォールバック。
+  const refColor = evaluation?.color ?? '#6366f1'
+  const refLabel = evaluation
+    ? `今¥${lowestPrice.toLocaleString()}・相場の${evaluation.position}（${evaluation.word}）`
+    : `今¥${lowestPrice.toLocaleString()}`
+  // 折れ線右端の日付。ReferenceDot で「現在地」を強調する。
+  const lastDate = priceHistory.length > 0 ? priceHistory[priceHistory.length - 1].date : null
+
   return (
     <div className="space-y-2">
       <button
@@ -32,17 +60,11 @@ export default function PriceHistoryChart({ priceHistory, lowestPrice, priceLeve
       {open && (() => {
         // 事実コメント生成（表示条件: 3つのオプション props がすべて存在）
         const comment = (() => {
-          if (!typicalPriceRange || !origin || !destination) return null
+          if (!evaluation || !origin || !destination) return null
           const originName = IATA_JP_NAMES[origin.toUpperCase()] ?? origin
           const destName = IATA_JP_NAMES[destination.toUpperCase()] ?? destination
           const routeName = `${originName}〜${destName}`
-          const [low, high] = typicalPriceRange
-          const ratio = (lowestPrice - low) / (high - low)
-          const position =
-            ratio <= 0.25 ? '下限付近のお得な水準' :
-            ratio <= 0.5  ? '通常価格帯の中間より安い水準' :
-            ratio <= 0.75 ? '通常価格帯の中間より高い水準' :
-                            '上限に近いやや高めの水準'
+          const { low, high, position, word } = evaluation
           const histPrices = priceHistory.map(p => p.price)
           const histMin = Math.min(...histPrices)
           const histMax = Math.max(...histPrices)
@@ -57,7 +79,7 @@ export default function PriceHistoryChart({ priceHistory, lowestPrice, priceLeve
           })()
           const lines = [
             `これは${routeName}路線全体の相場推移です。`,
-            `現在の最安値¥${lowestPrice.toLocaleString()}は、通常価格帯¥${low.toLocaleString()}〜¥${high.toLocaleString()}の${position}です。`,
+            `現在の最安値¥${lowestPrice.toLocaleString()}は、通常価格帯¥${low.toLocaleString()}〜¥${high.toLocaleString()}の${position}にあり、${word}と言える水準です。`,
             `過去2か月は¥${histMin.toLocaleString()}〜¥${histMax.toLocaleString()}で推移しており、${recentTrend ?? '傾向は不明'}です。`,
           ]
           return lines.join('\n')
@@ -99,10 +121,21 @@ export default function PriceHistoryChart({ priceHistory, lowestPrice, priceLeve
               />
               <ReferenceLine
                 y={lowestPrice}
-                stroke={lineColor}
-                strokeDasharray="4 2"
-                label={{ value: '現在最安値', position: 'insideTopRight', fontSize: 9, fill: lineColor }}
+                stroke={refColor}
+                strokeWidth={2}
+                strokeDasharray="5 4"
+                label={{ value: refLabel, position: 'insideTopRight', fontSize: 9, fontWeight: 600, fill: refColor }}
               />
+              {lastDate && (
+                <ReferenceDot
+                  x={lastDate}
+                  y={lowestPrice}
+                  r={4}
+                  fill={refColor}
+                  stroke="#ffffff"
+                  strokeWidth={1.5}
+                />
+              )}
               <Line
                 type="monotone"
                 dataKey="price"
