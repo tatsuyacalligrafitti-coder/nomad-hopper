@@ -106,7 +106,7 @@ function TpCard({ flight, badge, showBusinessBadge, isOneWay, query }: { flight:
         <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t border-gray-100 pt-3 sm:border-0 sm:pt-0">
           <div>
             <p className="text-xs text-gray-400 leading-none mb-1">
-              {isOneWay ? '片道' : '往復合計'}
+              {isOneWay ? '片道（代表価格）' : '往復合計（代表価格）'}
             </p>
             <p className="text-2xl font-bold text-indigo-700 tabular-nums leading-none">
               ¥{Math.round(flight.totalPrice).toLocaleString()}
@@ -116,6 +116,9 @@ function TpCard({ flight, badge, showBusinessBadge, isOneWay, query }: { flight:
                 片道目安 ¥{Math.round(flight.totalPrice / 2).toLocaleString()}〜
               </p>
             )}
+            <p className="text-xs text-gray-400 mt-1">
+              実際に購入できる価格は「予約先を選択」からご確認ください
+            </p>
             <div className="flex items-center gap-2 mt-1.5 text-xs flex-wrap">
               {flight.stops === 0 ? (
                 <span className="flex items-center gap-0.5 text-blue-600 font-semibold">
@@ -191,16 +194,16 @@ const CATEGORIES: CategoryConfig[] = [
   {
     key: 'cheapest',
     icon: '💰',
-    title: '最安値',
-    badge: '最安',
+    title: '代表価格',
+    badge: '代表',
     emptyMsg: '該当する便が見つかりませんでした',
     headerColor: 'text-indigo-700',
   },
   {
     key: 'cheapestDirect',
     icon: '⚡',
-    title: '直行便最安',
-    badge: '直行最安',
+    title: '直行便（代表価格）',
+    badge: '直行便',
     emptyMsg: '直行便は見つかりませんでした',
     headerColor: 'text-blue-600',
   },
