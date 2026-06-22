@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot, ResponsiveContainer, Brush } from 'recharts'
 import { IATA_JP_NAMES } from '@/lib/iata-names'
 
 interface Props {
@@ -107,7 +107,8 @@ export default function PriceHistoryChart({ priceHistory, lowestPrice, priceLeve
               {refLabel}
             </span>
           </div>
-          <ResponsiveContainer width="100%" height={160}>
+          {/* Brush（期間絞り込み）の帯ぶん、X軸ラベルと重ならないよう高さを最小限だけ加算（160→196） */}
+          <ResponsiveContainer width="100%" height={196}>
             <LineChart data={priceHistory} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
               <XAxis
@@ -152,6 +153,15 @@ export default function PriceHistoryChart({ priceHistory, lowestPrice, priceLeve
                 strokeWidth={2}
                 dot={{ r: 2, fill: lineColor }}
                 activeDot={{ r: 4 }}
+              />
+              {/* 期間絞り込み（ドラッグで範囲指定）。初期は全期間表示のまま startIndex/endIndex は未指定。
+                  目盛りは XAxis と同じ M/d フォーマットに揃え、色はテーマのインディゴ系で控えめに。 */}
+              <Brush
+                dataKey="date"
+                tickFormatter={(d: string) => format(parseISO(d), 'M/d')}
+                height={24}
+                stroke="#a5b4fc"
+                travellerWidth={8}
               />
             </LineChart>
           </ResponsiveContainer>
