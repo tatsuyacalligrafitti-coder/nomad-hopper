@@ -146,7 +146,7 @@ export default function BookingOptionsPanel({ flight, query, onClose }: Props) {
         </button>
       </div>
       <p className="text-xs text-gray-400 mt-1 mb-2">
-        ※ 最新の空席状況に基づく価格です。検索時の表示と差が出ることがあります。
+        ※ こちらが実際に購入できる最新価格です。上部は目安のため、差が出る場合があります。
       </p>
 
       {loading ? (
