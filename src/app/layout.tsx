@@ -8,6 +8,29 @@ const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
 export const metadata: Metadata = {
   title: 'Tobira — 自然言語で航空券を検索',
   description: '世界への扉を、あなたの手に。話しかけるだけで旅が始まる。',
+  metadataBase: new URL('https://tobira-world.jp'),
+  openGraph: {
+    title: 'Tobira — 自然言語で航空券を検索',
+    description: '世界への扉を、あなたの手に。話しかけるだけで旅が始まる。',
+    url: 'https://tobira-world.jp',
+    siteName: 'Tobira',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Tobira — 世界への扉を、あなたの手に。',
+      },
+    ],
+    locale: 'ja_JP',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Tobira — 自然言語で航空券を検索',
+    description: '世界への扉を、あなたの手に。話しかけるだけで旅が始まる。',
+    images: ['/og-image.png'],
+  },
   manifest: '/manifest.json',
   icons: {
     icon: '/favicon.ico',
