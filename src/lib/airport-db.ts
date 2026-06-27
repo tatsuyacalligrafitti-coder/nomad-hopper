@@ -23,7 +23,11 @@ const countryIndex = new Map<string, string[]>()
 // IATA → airport record
 const iataIndex = new Map<string, AirportRecord>()
 
+// 閉鎖空港（検索・変換の対象から除外する。例: TXL ベルリン・テーゲルは2020年閉鎖）
+const CLOSED_AIRPORTS = new Set(['TXL'])
+
 for (const ap of airports) {
+  if (CLOSED_AIRPORTS.has(ap.iata)) continue
   const cityKey = ap.city.toLowerCase().trim()
   const isIntl = ap.name.toLowerCase().includes('international')
   iataIndex.set(ap.iata, ap)
