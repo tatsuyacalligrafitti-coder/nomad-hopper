@@ -334,7 +334,7 @@ export default function FlightResults({ categorized, isLoading, error, query, mo
           <p className="text-sm text-gray-500 px-0.5">
             Powered by Travelpayouts · 最大9件を3カテゴリで表示
           </p>
-          {categorized!.priceInsights?.priceHistory && categorized!.priceInsights.priceHistory.length >= 2 && (
+          {categorized!.priceInsights && (categorized!.priceInsights.typicalPriceRange || (categorized!.priceInsights.priceHistory && categorized!.priceInsights.priceHistory.length >= 2)) && (
             <PriceHistoryChart
               priceHistory={categorized!.priceInsights.priceHistory}
               lowestPrice={categorized!.priceInsights.lowestPrice}
