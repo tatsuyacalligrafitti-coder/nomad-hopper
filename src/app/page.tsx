@@ -20,6 +20,8 @@ interface ExploreParams {
   rawQuery: string
 }
 
+// Aviasales 短縮パス形式（DDMM・年なし）。Aviasales が月日を直近の該当年に自動補完するため
+// 年跨ぎでも正しく開く（実検証済み）。詳細な経緯は src/lib/travelpayouts.ts の aviasalesLink 参照。
 function aviasalesUrl(origin: string, destination: string, departureDate: string, returnDate?: string | null): string {
   const toddmm = (iso: string) => {
     const [, m, d] = iso.split('-')
