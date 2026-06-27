@@ -1,6 +1,6 @@
 import type { FlightResult, FlightSegment, SearchQuery } from '@/types'
 
-const TOKEN = process.env.TRAVELPAYOUTS_TOKEN ?? '42275e1b582df74e978c3cd0c9c92308'
+const TOKEN = process.env.TRAVELPAYOUTS_TOKEN
 
 /**
  * Aviasales アフィリエイトリンク（marker=731864）。
@@ -44,6 +44,10 @@ interface V1Entry {
 }
 
 async function fetchV1(query: SearchQuery): Promise<FlightResult[]> {
+  if (!TOKEN) {
+    console.warn('[travelpayouts] TRAVELPAYOUTS_TOKEN未設定、スキップ')
+    return []
+  }
   const params = new URLSearchParams({
     origin: query.origin,
     destination: query.destination,
@@ -119,6 +123,10 @@ interface V2Entry {
 }
 
 async function fetchV2(query: SearchQuery): Promise<FlightResult[]> {
+  if (!TOKEN) {
+    console.warn('[travelpayouts] TRAVELPAYOUTS_TOKEN未設定、スキップ')
+    return []
+  }
   const params = new URLSearchParams({
     origin: query.origin,
     destination: query.destination,
