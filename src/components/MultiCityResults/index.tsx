@@ -764,14 +764,14 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                               </div>
 
                               {/* Per-segment price history chart */}
-                              {(seg.priceInsights?.priceHistory?.length ?? 0) >= 2 && (
+                              {seg.priceInsights && (seg.priceInsights.typicalPriceRange || (seg.priceInsights.priceHistory?.length ?? 0) >= 2) && (
                                 <div className="mt-2">
                                   <PriceHistoryChart
-                                    priceHistory={seg.priceInsights!.priceHistory!}
-                                    lowestPrice={seg.priceInsights!.lowestPrice}
-                                    priceLevel={seg.priceInsights!.priceLevel}
-                                    estimatedSavings={seg.priceInsights!.estimatedSavings ?? null}
-                                    typicalPriceRange={seg.priceInsights!.typicalPriceRange ?? null}
+                                    priceHistory={seg.priceInsights.priceHistory ?? null}
+                                    lowestPrice={seg.priceInsights.lowestPrice}
+                                    priceLevel={seg.priceInsights.priceLevel}
+                                    estimatedSavings={seg.priceInsights.estimatedSavings ?? null}
+                                    typicalPriceRange={seg.priceInsights.typicalPriceRange ?? null}
                                     origin={seg.origin}
                                     destination={seg.destination}
                                   />
