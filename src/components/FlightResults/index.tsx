@@ -117,7 +117,7 @@ function TpCard({ flight, badge, showBusinessBadge, isOneWay, query }: { flight:
               </p>
             )}
             <p className="text-xs text-gray-400 mt-1">
-              実際に購入できる価格は「予約先を選択」からご確認ください
+              これは目安の価格です。空席状況により変動するため、「予約先を選択」で最新価格をご確認ください
             </p>
             <div className="flex items-center gap-2 mt-1.5 text-xs flex-wrap">
               {flight.stops === 0 ? (
