@@ -2,7 +2,18 @@ import type { FlightResult, FlightSegment, SearchQuery } from '@/types'
 
 const TOKEN = process.env.TRAVELPAYOUTS_TOKEN ?? '42275e1b582df74e978c3cd0c9c92308'
 
-/** Aviasales affiliate link  marker=731864 */
+/**
+ * Aviasales アフィリエイトリンク（marker=731864）。
+ *
+ * 日付は DDMM 形式で、年(YYYY)を意図的に含めていない。
+ * 2026-06-27 にユーザーが実ブラウザで検証済み: Aviasales はパスの月日を
+ * 「今日以降の直近の該当月日」に自動補完するため、年跨ぎ検索（例: 6月に翌年1月発を
+ * 検索）でも正しい年で開く（結果画面の曜日表示で2027年と確認済み）。
+ * 公式推奨のクエリ形式（search.aviasales.com/flights/?depart_date=YYYY-MM-DD...）は
+ * 同日の実検証で aviasales.ru トップへリダイレクトされ検索条件が消失＝機能しなかったため、
+ * クエリ形式への移行は不可。短縮パス形式を維持する。
+ * 持ち越し: marker 計測が実際に効いているかは未確認（別途要検証）。
+ */
 export function aviasalesLink(
   origin: string,
   destination: string,
