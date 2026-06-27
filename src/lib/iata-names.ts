@@ -33,7 +33,7 @@ export const IATA_JP_NAMES: Record<string, string> = {
   // 欧州
   LHR: 'ロンドン', LGW: 'ロンドン', STN: 'ロンドン',
   CDG: 'パリ', ORY: 'パリ', NCE: 'ニース',
-  FRA: 'フランクフルト', MUC: 'ミュンヘン', DUS: 'デュッセルドルフ', TXL: 'ベルリン', BER: 'ベルリン',
+  FRA: 'フランクフルト', MUC: 'ミュンヘン', DUS: 'デュッセルドルフ', BER: 'ベルリン',
   AMS: 'アムステルダム',
   ZRH: 'チューリッヒ', GVA: 'ジュネーブ',
   VIE: 'ウィーン',
