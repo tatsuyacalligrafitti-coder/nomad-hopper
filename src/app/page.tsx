@@ -22,6 +22,11 @@ interface ExploreParams {
 
 // Aviasales 短縮パス形式（DDMM・年なし）。Aviasales が月日を直近の該当年に自動補完するため
 // 年跨ぎでも正しく開く（実検証済み）。詳細な経緯は src/lib/travelpayouts.ts の aviasalesLink 参照。
+//
+// 計測リンクは Travelpayouts の tp.media リダイレクタ経由。直接 aviasales.com/search/...?marker= 形式だと
+// Aviasales 側リダイレクトで marker が脱落し計測されない（本番URLで確認済み・Clicks 0→2 で実証）。
+// tp.media/r?...&u=<検索URL> 形式なら marker/trs/p/campaign_id をリダイレクタが計測してから目的URLへ転送する。
+// 固定4パラメータは Link変換API（links/v1/create）の戻り値で定数確認済み（往復/片道/別路線の3サンプル一致）。
 function aviasalesUrl(origin: string, destination: string, departureDate: string, returnDate?: string | null): string {
   const toddmm = (iso: string) => {
     const [, m, d] = iso.split('-')
@@ -30,7 +35,15 @@ function aviasalesUrl(origin: string, destination: string, departureDate: string
   const path = returnDate
     ? `${origin}${toddmm(departureDate)}${destination}${toddmm(returnDate)}1`
     : `${origin}${toddmm(departureDate)}${destination}1`
-  return `https://www.aviasales.com/search/${path}?marker=731864`
+  const searchUrl = `https://www.aviasales.com/search/${path}`
+  const params = new URLSearchParams({
+    campaign_id: '100',
+    marker: '731864',
+    p: '4114',
+    trs: '532321',
+    u: searchUrl,
+  })
+  return `https://tp.media/r?${params}`
 }
 
 const MODE_HINTS: Record<SearchMode, string> = {
