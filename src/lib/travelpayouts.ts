@@ -12,7 +12,11 @@ const TOKEN = process.env.TRAVELPAYOUTS_TOKEN
  * 公式推奨のクエリ形式（search.aviasales.com/flights/?depart_date=YYYY-MM-DD...）は
  * 同日の実検証で aviasales.ru トップへリダイレクトされ検索条件が消失＝機能しなかったため、
  * クエリ形式への移行は不可。短縮パス形式を維持する。
- * 持ち越し: marker 計測が実際に効いているかは未確認（別途要検証）。
+ *
+ * 計測リンクは Travelpayouts の tp.media リダイレクタ経由。直接 aviasales.com/search/...?marker= 形式だと
+ * Aviasales 側リダイレクトで marker が脱落し計測されない（本番URLで確認済み・Clicks 0→2 で実証）。
+ * tp.media/r?...&u=<検索URL> 形式なら marker/trs/p/campaign_id をリダイレクタが計測してから目的URLへ転送する。
+ * 固定4パラメータは Link変換API（links/v1/create）の戻り値で定数確認済み（往復/片道/別路線の3サンプル一致）。
  */
 export function aviasalesLink(
   origin: string,
@@ -28,7 +32,15 @@ export function aviasalesLink(
     path += `${rdd}${rmm}`
   }
   path += `${passengers}`
-  return `https://www.aviasales.com/search/${path}?marker=731864`
+  const searchUrl = `https://www.aviasales.com/search/${path}`
+  const params = new URLSearchParams({
+    campaign_id: '100',
+    marker: '731864',
+    p: '4114',
+    trs: '532321',
+    u: searchUrl,
+  })
+  return `https://tp.media/r?${params}`
 }
 
 // ─── v1/prices/cheap ──────────────────────────────────────────────────────────
