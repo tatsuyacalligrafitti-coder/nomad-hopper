@@ -116,7 +116,7 @@ function TpCard({ flight, badge, showBusinessBadge, isOneWay, query }: { flight:
                 片道目安 ¥{Math.round(flight.totalPrice / 2).toLocaleString()}〜
               </p>
             )}
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-gray-400 mt-1 max-w-[16rem]">
               これは目安の価格です。空席状況により変動するため、「予約先を選択」で最新価格をご確認ください
             </p>
             <div className="flex items-center gap-2 mt-1.5 text-xs flex-wrap">
