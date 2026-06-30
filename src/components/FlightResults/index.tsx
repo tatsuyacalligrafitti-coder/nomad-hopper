@@ -141,6 +141,9 @@ function TpCard({ flight, badge, showBusinessBadge, isOneWay, query }: { flight:
             >
               🔔 価格アラート登録
             </button>
+            {!hasTokens && (
+              <p className="text-xs text-gray-400 mt-1">予約サイトはドル表示になります</p>
+            )}
           </div>
 
           {hasTokens ? (

@@ -745,6 +745,7 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                                     >
                                       今すぐ予約→
                                     </a>
+                                    <p className="text-[10px] text-gray-400 text-center">予約サイトはドル表示になります</p>
                                     {onRetrySegment && (
                                       <button
                                         onClick={() => toggleEditPanel(ci)}
