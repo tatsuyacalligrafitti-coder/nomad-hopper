@@ -27,14 +27,14 @@ interface ExploreParams {
 // Aviasales 側リダイレクトで marker が脱落し計測されない（本番URLで確認済み・Clicks 0→2 で実証）。
 // tp.media/r?...&u=<検索URL> 形式なら marker/trs/p/campaign_id をリダイレクタが計測してから目的URLへ転送する。
 // 固定4パラメータは Link変換API（links/v1/create）の戻り値で定数確認済み（往復/片道/別路線の3サンプル一致）。
-function aviasalesUrl(origin: string, destination: string, departureDate: string, returnDate?: string | null): string {
+function aviasalesUrl(origin: string, destination: string, departureDate: string, passengers = 1, returnDate?: string | null): string {
   const toddmm = (iso: string) => {
     const [, m, d] = iso.split('-')
     return `${d}${m}`
   }
   const path = returnDate
-    ? `${origin}${toddmm(departureDate)}${destination}${toddmm(returnDate)}1`
-    : `${origin}${toddmm(departureDate)}${destination}1`
+    ? `${origin}${toddmm(departureDate)}${destination}${toddmm(returnDate)}${passengers}`
+    : `${origin}${toddmm(departureDate)}${destination}${passengers}`
   const searchUrl = `https://www.aviasales.com/search/${path}`
   const params = new URLSearchParams({
     campaign_id: '100',
@@ -752,7 +752,7 @@ export default function HomePage() {
         ) && (
           <div>
             <a
-              href={aviasalesUrl(lastQuery.origin, lastQuery.destination, lastQuery.departureDate, lastQuery.returnDate)}
+              href={aviasalesUrl(lastQuery.origin, lastQuery.destination, lastQuery.departureDate, lastQuery.passengers, lastQuery.returnDate)}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-purple-400 text-purple-600 hover:bg-purple-50 font-semibold text-sm transition-colors"
