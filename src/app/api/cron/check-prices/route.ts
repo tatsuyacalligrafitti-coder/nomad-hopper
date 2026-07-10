@@ -8,6 +8,7 @@ import {
 import type { StoredAlert } from '@/lib/alert-store'
 import { sendPriceDropEmail } from '@/lib/email'
 import { pushLineMessage, formatLineAlertMessage } from '@/lib/line'
+import { buildWatchlistQueries } from '@/lib/watchlist'
 import type { SearchQuery } from '@/types'
 
 // Allow long-running batch (many alerts × multi-provider search w/ polling).
@@ -93,12 +94,47 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // ── Watchlist: observe fixed routes for pricehist, recording only (no notify) ──
+  const watchlistQueries = buildWatchlistQueries(now)
+  console.log(`[cron] ウォッチリスト ${watchlistQueries.length}件を観測`)
+  let watchlistChecked = 0
+  const watchlistErrors: string[] = []
+
+  for (const query of watchlistQueries) {
+    try {
+      watchlistChecked++
+      const { flights } = await searchAllProviders(query)
+      if (flights.length === 0) {
+        console.log(`[cron] watchlist ${query.origin}→${query.destination} ${query.departureDate}: 0件、スキップ`)
+        continue
+      }
+      const lowest = flights.reduce(
+        (min, f) => (f.totalPrice < min.totalPrice ? f : min),
+        flights[0],
+      )
+      // Record only — watchlist entries never trigger notifications.
+      await recordPriceHistory(
+        query.origin,
+        query.destination,
+        query.departureDate,
+        lowest.totalPrice,
+        nowIso,
+      )
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[cron] watchlist ${query.origin}→${query.destination} ${query.departureDate} エラー:`, msg)
+      watchlistErrors.push(`${query.origin}-${query.destination}-${query.departureDate}: ${msg}`)
+    }
+  }
+
   const summary = {
     ok: true,
     checked,
     notified,
     errorCount: errors.length,
     errors,
+    watchlistChecked,
+    watchlistErrors,
     ranAt: nowIso,
   }
   console.log('[cron] 完了:', JSON.stringify(summary))
