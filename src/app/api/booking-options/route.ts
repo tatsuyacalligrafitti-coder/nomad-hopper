@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { recordPriceGap } from '@/lib/price-gap-log'
 
 interface RequestBody {
   bookingToken?: string
@@ -7,6 +8,7 @@ interface RequestBody {
   destination: string
   outboundDate: string
   returnDate?: string | null
+  representativePrice?: number
 }
 
 interface BookingOption {
@@ -67,7 +69,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ResponseBody>
     return NextResponse.json({ options: [], error: 'invalid_request' }, { status: 400 })
   }
 
-  const { bookingToken, departureToken, origin, destination, outboundDate, returnDate } = body
+  const { bookingToken, departureToken, origin, destination, outboundDate, returnDate, representativePrice } = body
   const isRoundTrip = !!returnDate
   const baseParams: Record<string, string> = {
     engine: 'google_flights',
@@ -114,6 +116,27 @@ export async function POST(req: NextRequest): Promise<NextResponse<ResponseBody>
     const options = normalizeOptions(rawOptions)
     const prices = options.map((o) => o.price).filter((p): p is number => p !== null)
     const lowestPrice = prices.length > 0 ? Math.min(...prices) : null
+
+    // 受動計測: 代表価格とライブOTA最安のズレを記録（ベストエフォート）。
+    // 代表価格が数値でライブ最安が取れたときだけ。失敗してもレスポンスは壊さない。
+    if (typeof representativePrice === 'number' && representativePrice > 0 && lowestPrice != null) {
+      try {
+        await recordPriceGap({
+          origin,
+          destination,
+          outboundDate,
+          returnDate: returnDate ?? null,
+          representativePrice,
+          liveLowest: lowestPrice,
+          diff: lowestPrice - representativePrice,
+          ratio: lowestPrice / representativePrice,
+          optionCount: prices.length,
+          recordedAt: new Date().toISOString(),
+        })
+      } catch (err) {
+        console.warn('[booking-options] price-gap 記録失敗（レスポンスは継続）:', err instanceof Error ? err.message : String(err))
+      }
+    }
 
     return NextResponse.json({ options, lowestPrice })
   } catch (err) {

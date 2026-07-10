@@ -104,6 +104,8 @@ export default function BookingOptionsPanel({ flight, query, onClose }: Props) {
             destination: query.destination,
             outboundDate: query.outboundDate,
             returnDate: query.returnDate ?? null,
+            // 代表価格（結果カードの表示値）。サーバーでライブ最安と比較しズレを計測する。
+            representativePrice: flight.totalPrice,
           }),
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
