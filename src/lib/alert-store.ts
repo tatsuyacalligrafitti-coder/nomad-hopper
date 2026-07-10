@@ -115,6 +115,20 @@ export interface PricePoint {
 const PRICEHIST_KEY = (origin: string, destination: string, departureDate: string) =>
   `pricehist:${origin}-${destination}-${departureDate}`
 
+// Keep a route's history for 7 days past its departure, then let it expire so keys
+// don't accumulate forever once every search records (not just alerted routes).
+const PRICEHIST_TTL_BUFFER_DAYS = 7
+
+// Seconds from `timestamp` until (departureDate + buffer). Returns <= 0 (or NaN)
+// when the departure is already past the buffer — caller treats that as "skip".
+function priceHistoryTtlSeconds(departureDate: string, timestamp: string): number {
+  const nowMs = new Date(timestamp).getTime()
+  const expiryMs =
+    new Date(`${departureDate}T00:00:00Z`).getTime() +
+    PRICEHIST_TTL_BUFFER_DAYS * 24 * 60 * 60 * 1000
+  return Math.ceil((expiryMs - nowMs) / 1000)
+}
+
 export async function recordPriceHistory(
   origin: string,
   destination: string,
@@ -131,13 +145,20 @@ export async function recordPriceHistory(
   const date = timestamp.slice(0, 10) // YYYY-MM-DD
   const key = PRICEHIST_KEY(origin, destination, departureDate)
 
+  // Guard: skip past departures so we never pass a non-positive TTL to Redis.
+  const ttlSeconds = priceHistoryTtlSeconds(departureDate, timestamp)
+  if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) {
+    console.log('[alert-store] 出発日が過ぎている（+7日超）ため記録をスキップ:', key)
+    return
+  }
+
   try {
     const existing = (await redis.get<PricePoint[]>(key)) ?? []
     // One sample per day: overwrite same-day entry, otherwise append.
     const filtered = existing.filter((p) => p.date !== date)
     filtered.push({ date, price })
-    await redis.set(key, filtered)
-    console.log('[alert-store] price recorded:', key, `¥${price.toLocaleString()}`)
+    await redis.set(key, filtered, { ex: ttlSeconds })
+    console.log('[alert-store] price recorded:', key, `¥${price.toLocaleString()}`, `(ttl ${ttlSeconds}s)`)
   } catch (err) {
     console.error('[alert-store] price history error:', err instanceof Error ? err.message : String(err))
   }
