@@ -8,6 +8,7 @@ import {
 } from '@/lib/parser'
 import { resolveFromDB } from '@/lib/airport-db'
 import { IATA_JP_NAMES } from '@/lib/iata-names'
+import { recordNluFailure } from '@/lib/nlu-failure-log'
 import type { MultiCityParsedQuery, MultiCitySegmentQuery, ParsedQuery, UnifiedQuery } from '@/types'
 
 // ── Converters to UnifiedQuery ────────────────────────────────────────────────
@@ -541,7 +542,10 @@ async function parseWithLLM(query: string): Promise<UnifiedQuery | null> {
       signal: controller.signal,
     })
 
-    if (!res.ok) return null
+    if (!res.ok) {
+      recordNluFailure('http_error', String(res.status)).catch(() => {})
+      return null
+    }
 
     const data = await res.json()
     const text: string = data.content?.[0]?.text ?? ''
@@ -552,18 +556,30 @@ async function parseWithLLM(query: string): Promise<UnifiedQuery | null> {
       raw = JSON.parse(cleaned)
     } catch {
       const match = cleaned.match(/\{[\s\S]*\}/)
-      if (!match) return null
-      try { raw = JSON.parse(match[0]) } catch { return null }
+      if (!match) {
+        recordNluFailure('json_parse').catch(() => {})
+        return null
+      }
+      try { raw = JSON.parse(match[0]) } catch {
+        recordNluFailure('json_parse').catch(() => {})
+        return null
+      }
     }
 
-    if (!raw.type || !Array.isArray(raw.legs) || raw.legs.length === 0) return null
+    if (!raw.type || !Array.isArray(raw.legs) || raw.legs.length === 0) {
+      recordNluFailure('invalid_shape').catch(() => {})
+      return null
+    }
 
     const passengers = parsePassengers(query)
     const cabinClass = parseCabinClass(query)
 
     const legs: UnifiedQuery['legs'] = []
     for (const leg of raw.legs) {
-      if (typeof leg !== 'object' || leg === null) return null
+      if (typeof leg !== 'object' || leg === null) {
+        recordNluFailure('invalid_shape').catch(() => {})
+        return null
+      }
       const l = leg as Record<string, unknown>
       const origin = typeof l.origin === 'string' ? (resolveCity(l.origin) ?? l.origin) : ''
       const destination = typeof l.destination === 'string' ? (resolveCity(l.destination) ?? l.destination) : ''
@@ -571,15 +587,24 @@ async function parseWithLLM(query: string): Promise<UnifiedQuery | null> {
       const date_role = VALID_DATE_ROLES.has(l.date_role as string)
         ? (l.date_role as 'departure' | 'arrival' | 'deadline')
         : 'departure'
-      if (!origin || !destination || !date) return null
+      if (!origin || !destination || !date) {
+        recordNluFailure('invalid_shape').catch(() => {})
+        return null
+      }
       legs.push({ origin, destination, date, date_role })
     }
 
     const type = raw.type as UnifiedQuery['type']
-    if (type !== 'one-way' && type !== 'round-trip' && type !== 'multi-city') return null
+    if (type !== 'one-way' && type !== 'round-trip' && type !== 'multi-city') {
+      recordNluFailure('invalid_shape').catch(() => {})
+      return null
+    }
 
     return { type, legs, passengers, cabinClass }
-  } catch {
+  } catch (err) {
+    // AbortError = our 5s timeout; anything else is an unexpected fetch/runtime error.
+    const detail = err instanceof Error && err.name !== 'AbortError' ? err.name : undefined
+    recordNluFailure('timeout', detail).catch(() => {})
     return null
   } finally {
     clearTimeout(timeoutId)
