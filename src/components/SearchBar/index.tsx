@@ -68,6 +68,15 @@ function hasAmbiguousDate(query: string): boolean {
   return ambiguous.test(query) && !specificDate.test(query) && !weekday.test(query)
 }
 
+// 往復（帰り）の意図を示す語彙を含む場合にtrue。復路日付が読めなかったときの警告に使う。
+function hasRoundTripIntent(text: string): boolean {
+  const jp = ['帰り', '帰る', '帰って', '帰国', '往復', '復路', '戻る', '戻り']
+  const en = ['round trip', 'return']
+  if (jp.some((w) => text.includes(w))) return true
+  const lower = text.toLowerCase()
+  return en.some((w) => lower.includes(w))
+}
+
 const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
   { onSearch, onMultiCitySearch, onExplore, isLoading },
   ref,
@@ -293,6 +302,16 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
               <span>{pq.passengers}名</span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 往復意図があるのに復路日付が読めなかったときの警告。検索はブロックしない。 */}
+      {pq && pq.departureDate && !pq.returnDate && hasRoundTripIntent(rawQuery) && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-3 py-2 text-sm">
+          <span>⚠️</span>
+          <span>
+            往復のご希望のようですが、帰りの日付を読み取れませんでした。このまま検索すると片道の結果になります。帰りの日付を「7/30に帰る」のように書き足してください
+          </span>
         </div>
       )}
 
