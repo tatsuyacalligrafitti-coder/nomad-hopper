@@ -509,18 +509,25 @@ async function parseWithLLM(query: string): Promise<UnifiedQuery | null> {
   if (!apiKey) return null
 
   const today = new Date().toISOString().slice(0, 10)
+  const exampleYear = today.slice(0, 4)
   const nextMonthDate = new Date()
   nextMonthDate.setMonth(nextMonthDate.getMonth() + 1)
   const nextMonth = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}-01`
 
   const systemPrompt = `航空券検索クエリを解析してJSONで返すAIです。
 以下のフォーマットのみで返答してください（説明不要）：
-{"type":"one-way"|"round-trip"|"multi-city","legs":[{"origin":"都市名","destination":"都市名","date":"YYYY-MM-DD","date_role":"departure"|"arrival"|"deadline"}]}
+{"type":"one-way"|"round-trip"|"multi-city","legs":[{"origin":"都市名または空港名","destination":"都市名または空港名","date":"YYYY-MM-DD","date_role":"departure"|"arrival"|"deadline"}]}
 ルール：
 - 2区間でA→B→Aのパターンは round-trip
 - 3区間以上はmulti-city
 - 日付がない場合は来月の1日を使う（${nextMonth}）
-- 今日の日付: ${today}`
+- 成田・羽田・関空・伊丹など特定の空港名が明示された場合は、都市名に置き換えず空港名をそのまま返す（例: 成田空港→成田）
+- 今日の日付: ${today}
+例：
+入力: 成田空港からベトナムへ、7/23出発で7/30に帰る
+出力: {"type":"round-trip","legs":[{"origin":"成田","destination":"ホーチミン","date":"${exampleYear}-07-23","date_role":"departure"},{"origin":"ホーチミン","destination":"成田","date":"${exampleYear}-07-30","date_role":"departure"}]}
+入力: 7/23に東京からソウルに行き7/30に帰ってくる
+出力: {"type":"round-trip","legs":[{"origin":"東京","destination":"ソウル","date":"${exampleYear}-07-23","date_role":"departure"},{"origin":"ソウル","destination":"東京","date":"${exampleYear}-07-30","date_role":"departure"}]}`
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 5000)
