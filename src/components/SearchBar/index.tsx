@@ -161,6 +161,8 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    // 送信の瞬間にカーソル点滅を消して「送信した」感を出す。
+    inputRef.current?.blur()
     setError('')
 
     let p: ParsedQuery | MultiCityParsedQuery | null = parsed
@@ -242,7 +244,8 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
             value={rawQuery}
             onChange={(e) => setRawQuery(e.target.value)}
             placeholder={placeholder}
-            className="flex-1 outline-none text-gray-800 text-base placeholder-gray-400 bg-transparent"
+            disabled={isLoading}
+            className="flex-1 outline-none text-gray-800 text-base placeholder-gray-400 bg-transparent disabled:text-gray-400 disabled:cursor-not-allowed"
           />
           {isParsing && <Loader2 className="text-indigo-400 animate-spin shrink-0" size={16} />}
           <button
@@ -251,7 +254,7 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
             className="shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white rounded-xl px-4 py-2 font-semibold text-sm transition-colors flex items-center gap-1.5"
           >
             {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
-            検索
+            {isLoading ? '検索中…' : '検索'}
           </button>
         </div>
       </form>
