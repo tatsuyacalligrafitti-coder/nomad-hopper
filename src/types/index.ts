@@ -85,11 +85,21 @@ export interface PriceInsights {
   estimatedSavings: number | null
 }
 
+// Position of the current price within Tobira's own past observations for a route.
+// Honest positioning only — never a prediction. Null upstream means "don't show".
+export interface ValidityNote {
+  percentile: number   // 0–100, position from the cheap end (count of cheaper observations / total)
+  sampleCount: number  // number of observations the position is drawn from
+  spanDays: number     // days between the oldest and newest observation
+  tone: 'low' | 'mid' | 'high'
+}
+
 export interface CategorizedFlights {
   cheapest: FlightResult[]
   cheapestDirect: FlightResult[]
   recommended: FlightResult[]
   priceInsights?: PriceInsights
+  validityNote?: ValidityNote | null
 }
 
 // ── Multi-city ────────────────────────────────────────────────────────────────

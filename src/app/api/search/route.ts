@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { searchAllProviders } from '@/lib/flight-search-orchestrator'
+import { assessPriceValidity } from '@/lib/price-validity'
 import type { FlightResult, SearchQuery, CategorizedFlights } from '@/types'
 
 function balanceScore(
@@ -68,6 +69,26 @@ export async function POST(request: NextRequest) {
     const { flights, priceInsights } = await searchAllProviders(query)
     const categorized = categorize(flights)
     if (priceInsights) categorized.priceInsights = priceInsights
+
+    // Position the current lowest price within our own observed history. Best-effort:
+    // a failure here must never degrade silently (warn) nor block the search.
+    if (flights.length > 0) {
+      try {
+        const currentPrice = Math.min(...flights.map((f) => f.totalPrice))
+        categorized.validityNote = await assessPriceValidity(
+          query.origin,
+          query.destination,
+          currentPrice,
+        )
+      } catch (err) {
+        console.warn(
+          '[search] 価格妥当性の判定に失敗（検索は継続）:',
+          err instanceof Error ? err.message : String(err),
+        )
+        categorized.validityNote = null
+      }
+    }
+
     return Response.json({ categorized, total: flights.length })
   } catch (err) {
     console.error('[search]', err)
