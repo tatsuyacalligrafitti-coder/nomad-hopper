@@ -219,3 +219,19 @@ export async function getPriceHistory(
     return []
   }
 }
+
+// Read the persistent per-route log (all departure dates). Single GET; returns []
+// when Redis is unavailable or the key doesn't exist yet.
+export async function getPriceLog(
+  origin: string,
+  destination: string,
+): Promise<PriceLogPoint[]> {
+  const redis = getRedis()
+  if (!redis) return []
+  try {
+    return (await redis.get<PriceLogPoint[]>(PRICEHIST_LOG_KEY(origin, destination))) ?? []
+  } catch (err) {
+    console.error('[alert-store] get price log error:', err instanceof Error ? err.message : String(err))
+    return []
+  }
+}

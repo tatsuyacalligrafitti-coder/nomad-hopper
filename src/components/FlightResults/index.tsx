@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Plane, Clock, Zap } from 'lucide-react'
-import type { CategorizedFlights, FlightResult, SearchQuery } from '@/types'
+import type { CategorizedFlights, FlightResult, SearchQuery, ValidityNote } from '@/types'
 import AlertModal from '@/components/AlertModal'
 import BookingOptionsPanel from '@/components/BookingOptionsPanel'
 import PriceHistoryChart from '@/components/PriceHistoryChart'
@@ -14,6 +14,38 @@ interface Props {
   query?: SearchQuery | null
   mode?: string
   loadingMessage?: string
+}
+
+// ─── Price validity note copy ───────────────────────────────────────────────────
+// Kept as constants so wording is easy to tune later. States a position within our
+// own observed history — never a prediction.
+const VALIDITY_DISCLAIMER =
+  '※Tobira自身の観測データに基づく位置情報です。将来の価格を予測するものではありません'
+
+function validityNoteText(note: ValidityNote): string {
+  const prefix = `この価格は、Tobiraが過去${note.spanDays}日間に実測した${note.sampleCount}回の観測の中で`
+  // 端のケースは「〜0%の位置」だと不自然。特に percentile=0 は過去最安値更新の瞬間。
+  if (note.percentile === 0) return `${prefix}最も安い水準です`
+  if (note.percentile === 100) return `${prefix}最も高い水準です`
+  if (note.tone === 'high') return `${prefix}高い方から${100 - note.percentile}%の位置です`
+  if (note.tone === 'mid') return `${prefix}安い方から${note.percentile}%の位置です（平均的な水準）`
+  return `${prefix}安い方から${note.percentile}%の位置です`
+}
+
+function ValidityNoteBox({ note }: { note: ValidityNote }) {
+  // Subtle tone accent, matching the restraint of the existing guidance notes.
+  const toneStyle =
+    note.tone === 'low'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+      : note.tone === 'high'
+        ? 'border-amber-200 bg-amber-50 text-amber-800'
+        : 'border-slate-200 bg-slate-50 text-slate-700'
+  return (
+    <div className={`rounded-xl border px-4 py-3 ${toneStyle}`}>
+      <p className="text-xs font-medium leading-relaxed">{validityNoteText(note)}</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-gray-400">{VALIDITY_DISCLAIMER}</p>
+    </div>
+  )
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -348,6 +380,7 @@ export default function FlightResults({ categorized, isLoading, error, query, mo
               destination={query?.destination}
             />
           )}
+          {categorized!.validityNote && <ValidityNoteBox note={categorized!.validityNote} />}
           {CATEGORIES.map((cfg) => (
             <CategorySection
               key={cfg.key}
