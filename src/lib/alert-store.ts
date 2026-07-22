@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { Redis } from '@upstash/redis'
 import type { AlertRequest } from '@/types'
+import { toJstDateString } from '@/lib/date-jst'
 
 // ─── Stored alert shape ─────────────────────────────────────────────────────────
 // AlertRequest fields + bookkeeping. lastNotifiedAt stays null until the price
@@ -108,7 +109,7 @@ export async function deleteAlert(alertId: string): Promise<void> {
 
 // ─── Price history (one observed cheapest price per route+date, per day) ─────────
 export interface PricePoint {
-  date: string  // YYYY-MM-DD
+  date: string  // YYYY-MM-DD (JST observation date)
   price: number
 }
 
@@ -118,6 +119,24 @@ const PRICEHIST_KEY = (origin: string, destination: string, departureDate: strin
 // Keep a route's history for 7 days past its departure, then let it expire so keys
 // don't accumulate forever once every search records (not just alerted routes).
 const PRICEHIST_TTL_BUFFER_DAYS = 7
+
+// ─── Persistent per-route observation log (no TTL) ───────────────────────────────
+// The departure-keyed history above expires 7 days past departure, so observations
+// are never retained as a long-term asset. This companion key accumulates every
+// observation for a route across all departure dates and never expires.
+export interface PriceLogPoint {
+  d: string    // observation date (JST, YYYY-MM-DD)
+  dep: string  // departure date (YYYY-MM-DD)
+  p: number    // observed cheapest price
+}
+
+const PRICEHIST_LOG_KEY = (origin: string, destination: string) =>
+  `pricehist:log:${origin}-${destination}`
+
+// Safety valve against unbounded growth. Not expected to be reached in practice
+// (2 routes × 2 offsets × daily ≈ years of runway), but we never let a key grow
+// without bound. On overflow we drop the oldest entries (array is append-ordered).
+const PRICEHIST_LOG_MAX = 2000
 
 // Seconds from `timestamp` until (departureDate + buffer). Returns <= 0 (or NaN)
 // when the departure is already past the buffer — caller treats that as "skip".
@@ -142,7 +161,9 @@ export async function recordPriceHistory(
     return
   }
 
-  const date = timestamp.slice(0, 10) // YYYY-MM-DD
+  // Observation date on the JST calendar (records made in the JST morning must
+  // not slip to the previous UTC day). Shared with watchlist target-date logic.
+  const date = toJstDateString(new Date(timestamp).getTime()) // YYYY-MM-DD (JST)
   const key = PRICEHIST_KEY(origin, destination, departureDate)
 
   // Guard: skip past departures so we never pass a non-positive TTL to Redis.
@@ -161,6 +182,26 @@ export async function recordPriceHistory(
     console.log('[alert-store] price recorded:', key, `¥${price.toLocaleString()}`, `(ttl ${ttlSeconds}s)`)
   } catch (err) {
     console.error('[alert-store] price history error:', err instanceof Error ? err.message : String(err))
+  }
+
+  // Persistent per-route log (no TTL). Separate try/catch so a failure here never
+  // undoes the departure-keyed record above. Command budget: GET + SET (the two
+  // commands this persistent log adds per recording).
+  try {
+    const logKey = PRICEHIST_LOG_KEY(origin, destination)
+    const existingLog = (await redis.get<PriceLogPoint[]>(logKey)) ?? []
+    // One sample per (observation date, departure date): overwrite, else append.
+    const filteredLog = existingLog.filter((e) => !(e.d === date && e.dep === departureDate))
+    filteredLog.push({ d: date, dep: departureDate, p: price })
+    // Safety valve: keep the newest PRICEHIST_LOG_MAX, dropping oldest first.
+    const capped =
+      filteredLog.length > PRICEHIST_LOG_MAX
+        ? filteredLog.slice(filteredLog.length - PRICEHIST_LOG_MAX)
+        : filteredLog
+    await redis.set(logKey, capped) // no TTL — permanent asset
+    console.log('[alert-store] price logged (persistent):', logKey, `(${capped.length} pts)`)
+  } catch (err) {
+    console.error('[alert-store] price log error:', err instanceof Error ? err.message : String(err))
   }
 }
 
