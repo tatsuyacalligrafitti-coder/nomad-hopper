@@ -24,6 +24,9 @@ const VALIDITY_DISCLAIMER =
 
 function validityNoteText(note: ValidityNote): string {
   const prefix = `この価格は、Tobiraが過去${note.spanDays}日間に実測した${note.sampleCount}回の観測の中で`
+  // 端のケースは「〜0%の位置」だと不自然。特に percentile=0 は過去最安値更新の瞬間。
+  if (note.percentile === 0) return `${prefix}最も安い水準です`
+  if (note.percentile === 100) return `${prefix}最も高い水準です`
   if (note.tone === 'high') return `${prefix}高い方から${100 - note.percentile}%の位置です`
   if (note.tone === 'mid') return `${prefix}安い方から${note.percentile}%の位置です（平均的な水準）`
   return `${prefix}安い方から${note.percentile}%の位置です`
