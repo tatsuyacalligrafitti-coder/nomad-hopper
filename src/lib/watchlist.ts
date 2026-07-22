@@ -1,4 +1,5 @@
 import type { SearchQuery } from '@/types'
+import { toJstDateString } from '@/lib/date-jst'
 
 // ─── Fixed watchlist for daily price observation ────────────────────────────────
 // The price-monitor cron only checks user-registered alerts. To accumulate
@@ -12,15 +13,6 @@ export const WATCHLIST_ROUTES: { origin: string; destination: string }[] = [
 
 // Days ahead of "now" to sample each route at (captures both near and mid-term).
 export const WATCHLIST_OFFSETS_DAYS: number[] = [7, 30]
-
-// Format a UTC epoch as a JST (UTC+9) calendar date "YYYY-MM-DD".
-function toJstDateString(ms: number): string {
-  const jst = new Date(ms + 9 * 60 * 60 * 1000)
-  const y = jst.getUTCFullYear()
-  const m = String(jst.getUTCMonth() + 1).padStart(2, '0')
-  const d = String(jst.getUTCDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
 
 // One query per route × offset. Shape matches the cron's alert query
 // (passengers 1 / economy / one-way) so both flow through the same pipeline.
