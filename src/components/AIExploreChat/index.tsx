@@ -24,7 +24,7 @@ interface Props {
   onSetQuery?: (q: string) => void
 }
 
-export default function AIExploreChat({ origin, destination, rawQuery, onSearch, onSetQuery }: Props) {
+export default function AIExploreChat({ origin, destination, rawQuery }: Props) {
   const [messages, setMessages] = useState<ExploreMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -74,25 +74,6 @@ export default function AIExploreChat({ origin, destination, rawQuery, onSearch,
 
     return () => { cancelled = true }
   }, [origin, destination, rawQuery])
-
-  const handleDateSelect = (date: SuggestedDate) => {
-    if (origin && destination) {
-      const raw = `${origin}から${destination} ${date.departure}出発${date.return ? ` ${date.return}帰り` : ''}`
-      onSetQuery?.(raw)
-      onSearch({
-        origin,
-        destination,
-        departureDate: date.departure,
-        returnDate: date.return,
-        passengers: 1,
-        cabinClass: 'economy',
-        rawQuery: raw,
-      })
-    } else {
-      const fragment = `${date.departure}出発${date.return ? ` ${date.return}帰り` : ''}`
-      onSetQuery?.(`${rawQuery} ${fragment}`)
-    }
-  }
 
   const handleSend = async (textOverride?: string) => {
     const trimmed = (textOverride ?? chatInput).trim()

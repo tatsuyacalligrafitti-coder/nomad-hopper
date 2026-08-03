@@ -330,7 +330,6 @@ function Skeleton() {
 
 // ─── Main export ───────────────────────────────────────────────────────────────
 export default function FlightResults({ categorized, isLoading, error, query, mode, loadingMessage }: Props) {
-  const hasQuery = !!(query?.origin && query?.destination && query?.departureDate)
   const hasResults = !!(
     categorized &&
     (categorized.cheapest.length > 0 ||
