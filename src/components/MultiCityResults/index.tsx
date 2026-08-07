@@ -152,12 +152,6 @@ function SegmentEditPanel({ segIdx, seg, hasFlight, onRetrySegment }: SegmentEdi
   const [pendingOrigin, setPendingOrigin] = useState<string | undefined>(undefined)
   const [pendingDest, setPendingDest] = useState<string | undefined>(undefined)
 
-  useEffect(() => {
-    setPendingDate(seg.date)
-    setPendingOrigin(undefined)
-    setPendingDest(undefined)
-  }, [seg.date, seg.origin, seg.destination])
-
   const originNearby = NEARBY_AIRPORTS[seg.origin.toUpperCase()] ?? []
   const destNearby = NEARBY_AIRPORTS[seg.destination.toUpperCase()] ?? []
 
@@ -334,6 +328,9 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
   )
 
   // Reset selections when a new search result arrives
+  // 意図的なパターン: 検索結果(prop)が差し替わったときに複数の内部stateを一括リセットする。
+  // 並び替え履歴を保持する必要があり key によるリマウントでは代替できない。
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setSelectedFlights(initialSelectedFlights ?? {})
     setChangeComment(null)
@@ -375,6 +372,7 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
       }
     }
   }, [forcedSelections])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
 
   const handleSelectFlight = async (segIdx: number, newFlightIdx: number, oldFlightIdx: number) => {
@@ -790,7 +788,7 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                               )}
                               {/* Universal segment edit panel — shown when toggled */}
                               {onRetrySegment && editOpenSegments.has(ci) && (
-                                <SegmentEditPanel segIdx={ci} seg={seg} hasFlight={true} onRetrySegment={onRetrySegment} />
+                                <SegmentEditPanel key={`${seg.date}|${seg.origin}|${seg.destination}`} segIdx={ci} seg={seg} hasFlight={true} onRetrySegment={onRetrySegment} />
                               )}
 
                               {/* Expanded flight list — all alternatives with select button */}
@@ -847,7 +845,7 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
                             </>
                           )
                         })() : onRetrySegment ? (
-                          <SegmentEditPanel segIdx={ci} seg={seg} hasFlight={false} onRetrySegment={onRetrySegment} />
+                          <SegmentEditPanel key={`${seg.date}|${seg.origin}|${seg.destination}`} segIdx={ci} seg={seg} hasFlight={false} onRetrySegment={onRetrySegment} />
                         ) : (
                           <div className="flex items-center justify-between">
                             <p className="text-xs text-gray-400">{formatDate(seg.date)} 出発</p>

@@ -44,6 +44,9 @@ export default function AIExploreChat({ origin, destination, rawQuery }: Props) 
   }, [messages])
 
   // Load initial AI response
+  // 意図的なパターン: マウント時に外部API取得を開始し、開始前にローディング表示へ切り替える。
+  // fetch開始とstateリセットは同期させる必要があるため effect 内で行う。
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     let cancelled = false
     setIsLoading(true)
@@ -74,6 +77,7 @@ export default function AIExploreChat({ origin, destination, rawQuery }: Props) 
 
     return () => { cancelled = true }
   }, [origin, destination, rawQuery])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSend = async (textOverride?: string) => {
     const trimmed = (textOverride ?? chatInput).trim()

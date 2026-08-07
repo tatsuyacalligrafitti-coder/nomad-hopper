@@ -292,6 +292,10 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
   const [page, setPage] = useState(0)
   const [openReason, setOpenReason] = useState<OpenReason>(null)
 
+  // 意図的なパターン: localStorage(初回訪問/更新既読フラグ)というReact外部の状態を
+  // マウント時に読み取って表示可否を決める。SSRとの不一致を避けるため effect 内で行う。
+  // 直下の forcedOpen 側も、親からの明示的なオープン指示を内部stateへ橋渡しするもの。
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const onboardingSeen = !!safeGetStorage(STORAGE_KEY)
     const updateSeen = safeGetStorage(UPDATE_STORAGE_KEY) === LATEST_UPDATE_VERSION
@@ -314,6 +318,7 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
       setIsOpen(true)
     }
   }, [forcedOpen])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const isVisible = isOpen || !!forcedOpen
 

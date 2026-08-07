@@ -274,6 +274,9 @@ export default function HomePage() {
   }
 
   // Auto-search from shared URL (?q=...&sel=...) and LINE OAuth callback
+  // 意図的なパターン: URL / sessionStorage というReact外部の状態を初回マウント時に
+  // 読み取って画面へ反映している。派生stateではないため useMemo 等では置き換えられない。
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
 
@@ -324,6 +327,7 @@ export default function HomePage() {
       .catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleModeChange = async (newMode: SearchMode) => {
     const prevMode = mode
