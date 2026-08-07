@@ -347,6 +347,18 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result])
 
+  // ── Chat state ───────────────────────────────────────────────────────────────
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const chatInputRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    const el = chatContainerRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [chatMessages, chatLoading])
+
   // Apply mode-driven forced selections; also close any open AI analysis
   useEffect(() => {
     if (forcedSelections != null) {
@@ -414,18 +426,6 @@ export default function MultiCityResults({ result, isLoading, error, onReSearch,
       return next
     })
   }
-
-  // ── Chat state ───────────────────────────────────────────────────────────────
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
-  const [chatInput, setChatInput] = useState('')
-  const [chatLoading, setChatLoading] = useState(false)
-  const chatContainerRef = useRef<HTMLDivElement>(null)
-  const chatInputRef = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    const el = chatContainerRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [chatMessages, chatLoading])
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleAnalyze = async () => {
