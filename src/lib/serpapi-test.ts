@@ -1,6 +1,26 @@
 // SerpAPI Google Flights 接続テスト用スクリプト
 // 実行: npx ts-node src/lib/serpapi-test.ts
 
+interface SerpApiFlightLeg {
+  airline?: string
+  flight_number?: string
+  departure_airport?: { time?: string }
+  arrival_airport?: { time?: string }
+}
+
+interface SerpApiFlightResult {
+  flights?: SerpApiFlightLeg[]
+  price?: number
+  booking_token?: string
+  departure_token?: string
+}
+
+interface SerpApiGoogleFlightsResponse {
+  error?: string
+  best_flights?: SerpApiFlightResult[]
+  other_flights?: SerpApiFlightResult[]
+}
+
 const SERPAPI_KEY = process.env.SERPAPI_KEY;
 if (!SERPAPI_KEY) {
   console.error("ERROR: SERPAPI_KEY が設定されていません");
@@ -31,7 +51,7 @@ fetch(url)
     console.log(`HTTPステータス: ${res.status} ${res.statusText}`);
     return res.json();
   })
-  .then((data: any) => {
+  .then((data: SerpApiGoogleFlightsResponse) => {
     if (data.error) {
       console.error("APIエラー:", data.error);
       return;
@@ -43,7 +63,7 @@ fetch(url)
 
     console.log(`フライト件数: best=${best.length}, other=${other.length}\n`);
 
-    allFlights.slice(0, 5).forEach((f: any, i: number) => {
+    allFlights.slice(0, 5).forEach((f: SerpApiFlightResult, i: number) => {
       const leg = f.flights?.[0];
       const airline = leg?.airline ?? "不明";
       const dep = leg?.departure_airport?.time ?? "-";

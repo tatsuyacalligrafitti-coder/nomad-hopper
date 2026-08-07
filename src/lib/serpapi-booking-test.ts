@@ -3,6 +3,42 @@
 //   または: npx tsx src/lib/serpapi-booking-test.ts
 export {}
 
+interface SerpApiBookingRequest {
+  url?: string
+  post_data?: string
+}
+
+interface SerpApiBookingOptionData {
+  book_with?: string
+  price?: number
+  marketed_as?: string[]
+  booking_request?: SerpApiBookingRequest
+  airline?: boolean
+}
+
+interface SerpApiBookingOption extends SerpApiBookingOptionData {
+  together?: SerpApiBookingOptionData
+}
+
+interface SerpApiFlightLeg {
+  airline?: string
+  flight_number?: string
+}
+
+interface SerpApiFlightResult {
+  flights?: SerpApiFlightLeg[]
+  price?: number
+  booking_token?: string
+  departure_token?: string
+  booking_options?: SerpApiBookingOption[]
+}
+
+interface SerpApiResponse {
+  error?: string
+  best_flights?: SerpApiFlightResult[]
+  booking_options?: SerpApiBookingOption[]
+}
+
 const SERPAPI_KEY = process.env.SERPAPI_KEY
 if (!SERPAPI_KEY) {
   console.error('ERROR: SERPAPI_KEY が設定されていません')
@@ -11,7 +47,7 @@ if (!SERPAPI_KEY) {
 
 const BASE = 'https://serpapi.com/search.json'
 
-async function serpFetch(params: Record<string, string>): Promise<any> {
+async function serpFetch(params: Record<string, string>): Promise<SerpApiResponse> {
   const qs = new URLSearchParams({ ...params, api_key: SERPAPI_KEY! })
   const url = `${BASE}?${qs.toString()}`
   const res = await fetch(url)
@@ -19,12 +55,12 @@ async function serpFetch(params: Record<string, string>): Promise<any> {
   return res.json()
 }
 
-function printBookingOptions(options: any[]): void {
+function printBookingOptions(options: SerpApiBookingOption[]): void {
   if (!options || options.length === 0) {
     console.log('  booking_options: なし')
     return
   }
-  options.forEach((opt: any, i: number) => {
+  options.forEach((opt: SerpApiBookingOption, i: number) => {
     // SerpAPI は booking_options[i].together に実データをネスト
     const d = opt.together ?? opt
     console.log(`  [${i + 1}] book_with    : ${d.book_with ?? '(なし)'}`)
