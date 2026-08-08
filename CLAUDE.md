@@ -105,3 +105,4 @@ Tobira: 旅行検索AIコンシェルジュ（tobira-world.jp、Next.js/TypeScri
 - [2026-08-09] add_decision.sh / set_link.sh の第1引数は ishizu / tobira / all の3つのみ。
   それ以外の語（共通・両方・both 等）は使えない。all は両プロジェクトに関わる
   思想・運用ルールにのみ使う
+- [2026-08-09] 完了の定義は依頼全体。台帳に【未完了の依頼】章を常設し完了まで消さない
