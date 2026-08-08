@@ -95,3 +95,4 @@ Tobira: 旅行検索AIコンシェルジュ（tobira-world.jp、Next.js/TypeScri
 （両課に共通する決定をここに置く。追記は ~/ai-office/add_decision.sh）
 
 - [2026-08-08] 決定台帳の正本はローカルdocs、ナレッジは控え
+- [2026-08-08] 台帳追記はadd_decision.sh経由・Claudeが行を出力
