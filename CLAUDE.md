@@ -103,3 +103,6 @@ Tobira: 旅行検索AIコンシェルジュ（tobira-world.jp、Next.js/TypeScri
 - [2026-08-09] 機能・文言の実機確認でウエマツからOKが出たときは、その場で台帳追記行
   （cd ~/ai-office && ./add_decision.sh ...）を出力する
 - [2026-08-09] 機能・文言の実機確認OK時はその場で台帳追記行を出力する
+- [2026-08-09] add_decision.sh / set_link.sh の第1引数は ishizu / tobira / all の3つのみ。
+  それ以外の語（共通・両方・both 等）は使えない。all は両プロジェクトに関わる
+  思想・運用ルールにのみ使う
