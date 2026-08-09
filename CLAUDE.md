@@ -112,3 +112,4 @@ Tobira: 旅行検索AIコンシェルジュ（tobira-world.jp、Next.js/TypeScri
 - [2026-08-09] 本社ナレッジ用の控えはdecisions_all.mdを自動生成し人は差し替えるのみ
 - [2026-08-09] ai-officeのスクリプトを変更したClaudeはその場でcommitまで済ませる
 - [2026-08-09] ai-officeの未記録変更は日次実行時に1行通知。自動commitはしない
+- [2026-08-09] 選択肢提示時は各案に「誰が何を失うか」を必ず明記する
