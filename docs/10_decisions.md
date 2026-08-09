@@ -14,6 +14,7 @@
 - [2026-08-09] チャットは回数でなくテーマの完了で切る。未完了の依頼がある間は切らない
 - [2026-08-09] add_decision.shはishizu/tobira/all、set_link.shはishizu/tobira/office
 - [2026-08-09] 本社ナレッジ用の控えはdecisions_all.mdを自動生成し人は差し替えるのみ
+- [2026-08-09] ai-officeのスクリプトを変更したClaudeはその場でcommitまで済ませる
 
 ## 未完了の依頼（完了まで消さない・引き継ぎ時は最優先で伝える）
 
