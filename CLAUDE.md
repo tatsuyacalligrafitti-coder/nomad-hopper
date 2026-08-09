@@ -111,3 +111,4 @@ Tobira: 旅行検索AIコンシェルジュ（tobira-world.jp、Next.js/TypeScri
 - [2026-08-09] add_decision.shはishizu/tobira/all、set_link.shはishizu/tobira/office
 - [2026-08-09] 本社ナレッジ用の控えはdecisions_all.mdを自動生成し人は差し替えるのみ
 - [2026-08-09] ai-officeのスクリプトを変更したClaudeはその場でcommitまで済ませる
+- [2026-08-09] ai-officeの未記録変更は日次実行時に1行通知。自動commitはしない
