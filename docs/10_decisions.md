@@ -29,3 +29,8 @@
 -->
 
 （現在なし）
+
+### [2026-08-11 依頼] 法務ページの整備とPR-D1（依頼者: ウエマツ）
+- 依頼原文の要旨: 法務ページ公開とVercel Analyticsのbeforeend修正（PR-D1）を完了させ、その後Phase 1（3扉＋チップ）UI設計へ進む
+- 完了済み: info@tobira-world.jp の開通（Workspaceエイリアス・疎通確認済み）
+- 未完了: プライバシーポリシー作成・公開／利用規約／特定商取引法表記の要否判断／Vercel Analytics beforeSend（?q=除去）／Phase 1 UI設計
