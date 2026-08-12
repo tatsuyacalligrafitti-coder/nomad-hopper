@@ -16,7 +16,7 @@ type NotifyMethod = 'email' | 'line'
 export default function AlertModal({ flight, onClose, prefilledLineUserId, prefilledLineDisplayName }: Props) {
   const [method, setMethod] = useState<NotifyMethod>(prefilledLineUserId ? 'line' : 'email')
   const [email, setEmail] = useState('')
-  const [lineUserId, setLineUserId] = useState(prefilledLineUserId ?? '')
+  const [lineUserId] = useState(prefilledLineUserId ?? '')
   // 入力中は文字列で保持し、空文字を許容する（全削除で 0 が残るのを防ぐ）。
   const [targetPrice, setTargetPrice] = useState(
     String(Math.floor(flight.totalPrice * 0.9))

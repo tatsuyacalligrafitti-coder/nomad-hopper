@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": ["Read", "Edit", "Write", "Glob", "Grep", "Bash"],
+    "ask": [],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/.ssh/**)",
+      "Read(**/gcp/**)",
+      "Read(**/id_rsa)",
+      "Read(**/id_ed25519)",
+      "Read(**/*.pem)",
+      "Bash(sudo:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/guard.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

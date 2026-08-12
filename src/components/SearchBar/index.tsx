@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { Search, Loader2, MapPin, Calendar, Users, Plane } from 'lucide-react'
-import { parseSearchQuery } from '@/lib/parser'
 import type { SearchQuery, ParsedQuery, MultiCityParsedQuery, UnifiedQuery } from '@/types'
 
 function unifiedToSearchBarFormat(uq: UnifiedQuery): ParsedQuery | MultiCityParsedQuery {

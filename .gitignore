@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ローカル専用ファイル（この環境でのみ使う設定・作業ファイル）
+.claude/launch.json
+.claude/settings.json.bak
+claude-checkup-card.html
+claude-checkup-history.json
+
+# claude のローカル設定・バックアップ（APIキーが紛れ込んでも公開されないよう必ず除外）
+.claude/settings.local.json
+.claude/*.bak

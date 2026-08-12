@@ -210,7 +210,73 @@ export default function HomePage() {
   const searchBarRef = useRef<SearchBarHandle>(null)
   const aiChatRef = useRef<AIChatHandle>(null)
 
+  const handleMultiCitySearch = async (query: MultiCityParsedQuery, rawQuery?: string) => {
+    setIsMultiCityLoading(true)
+    setMultiCityError('')
+    setMultiCityResult(null)
+    setMultiCityForcedSelections(null)
+    setLastMultiCityParsedQuery(query)
+    if (rawQuery !== undefined) setMultiCityRawQuery(rawQuery)
+    setCategorized(null)
+    setSearched(false)
+    setExploreParams(null)
+    try {
+      const res = await fetch('/api/search-multi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          segments: query.segments,
+          passengers: query.passengers,
+          cabinClass: query.cabinClass,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? '検索に失敗しました')
+      setMultiCityResult(data)
+      setBaseMultiCityResult(data)
+    } catch (err) {
+      setMultiCityError(err instanceof Error ? err.message : '検索に失敗しました')
+    } finally {
+      setIsMultiCityLoading(false)
+    }
+  }
+
+  const handleSearch = async (query: SearchQuery) => {
+    setIsLoading(true)
+    setError('')
+    setSearched(true)
+    setLastQuery(query)
+    setMultiCityResult(null)
+    setMultiCityError('')
+    setExploreParams(null)
+
+    const searchQuery: SearchQuery =
+      mode === 'elegant' ? { ...query, cabinClass: 'business' } : query
+
+    try {
+      const results = await fetchFlights(searchQuery)
+      if (mode !== 'elegant') {
+        setBaseCategorized(results)
+        setCategorized(
+          mode === 'fastest' && results ? applyFastestSort(results) :
+          mode === 'balance' && results ? applyBalanceSort(results) :
+          results
+        )
+      } else {
+        setCategorized(results ? applyElegantSort(results) : results)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '検索に失敗しました')
+      setCategorized(null)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   // Auto-search from shared URL (?q=...&sel=...) and LINE OAuth callback
+  // 意図的なパターン: URL / sessionStorage というReact外部の状態を初回マウント時に
+  // 読み取って画面へ反映している。派生stateではないため useMemo 等では置き換えられない。
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
 
@@ -261,6 +327,7 @@ export default function HomePage() {
       .catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleModeChange = async (newMode: SearchMode) => {
     const prevMode = mode
@@ -402,37 +469,6 @@ export default function HomePage() {
     setError('')
   }
 
-  const handleMultiCitySearch = async (query: MultiCityParsedQuery, rawQuery?: string) => {
-    setIsMultiCityLoading(true)
-    setMultiCityError('')
-    setMultiCityResult(null)
-    setMultiCityForcedSelections(null)
-    setLastMultiCityParsedQuery(query)
-    if (rawQuery !== undefined) setMultiCityRawQuery(rawQuery)
-    setCategorized(null)
-    setSearched(false)
-    setExploreParams(null)
-    try {
-      const res = await fetch('/api/search-multi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          segments: query.segments,
-          passengers: query.passengers,
-          cabinClass: query.cabinClass,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? '検索に失敗しました')
-      setMultiCityResult(data)
-      setBaseMultiCityResult(data)
-    } catch (err) {
-      setMultiCityError(err instanceof Error ? err.message : '検索に失敗しました')
-    } finally {
-      setIsMultiCityLoading(false)
-    }
-  }
-
   const handleReorderSearch = async (newSegments: Array<{ origin: string; destination: string; date: string }>) => {
     if (!lastMultiCityParsedQuery) return
     setIsMultiCityLoading(true)
@@ -572,38 +608,6 @@ export default function HomePage() {
       // in the search bar so the user can refine it manually — no error shown.
     } catch {
       // Network or parse error: silently leave query in search bar
-    }
-  }
-
-  const handleSearch = async (query: SearchQuery) => {
-    setIsLoading(true)
-    setError('')
-    setSearched(true)
-    setLastQuery(query)
-    setMultiCityResult(null)
-    setMultiCityError('')
-    setExploreParams(null)
-
-    const searchQuery: SearchQuery =
-      mode === 'elegant' ? { ...query, cabinClass: 'business' } : query
-
-    try {
-      const results = await fetchFlights(searchQuery)
-      if (mode !== 'elegant') {
-        setBaseCategorized(results)
-        setCategorized(
-          mode === 'fastest' && results ? applyFastestSort(results) :
-          mode === 'balance' && results ? applyBalanceSort(results) :
-          results
-        )
-      } else {
-        setCategorized(results ? applyElegantSort(results) : results)
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '検索に失敗しました')
-      setCategorized(null)
-    } finally {
-      setIsLoading(false)
     }
   }
 
