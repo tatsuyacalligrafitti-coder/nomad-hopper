@@ -45,3 +45,7 @@ next-env.d.ts
 .claude/settings.json.bak
 claude-checkup-card.html
 claude-checkup-history.json
+
+# claude のローカル設定・バックアップ（APIキーが紛れ込んでも公開されないよう必ず除外）
+.claude/settings.local.json
+.claude/*.bak
