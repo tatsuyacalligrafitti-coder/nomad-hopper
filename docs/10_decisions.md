@@ -43,9 +43,9 @@
 
 ### [2026-08-11 依頼] 法務ページの整備とPR-D1（依頼者: ウエマツ）
 - 依頼原文の要旨: 法務ページ公開とVercel Analyticsのbeforeend修正（PR-D1）を完了させ、その後Phase 1（3扉＋チップ）UI設計へ進む
-- 完了済み: info@tobira-world.jp の開通（Workspaceエイリアス・疎通確認済み）／beforeSendの部品 src/components/AnalyticsWithFilter.tsx の作成（layout.tsxへの接続は未実施）
-- 未完了: プライバシーポリシー作成・公開／利用規約／特定商取引法表記の要否判断／beforeSendのlayout.tsxへの接続／Phase 1 UI設計
-- 中断理由: 2026-08-12に承認ダイアログと安全装置の不具合対応を優先したため
+- 完了済み: info@tobira-world.jp の開通（Workspaceエイリアス・疎通確認済み）／プライバシーポリシー公開（PR #58）／beforeSend接続（実測は未）
+- 未完了: beforeSendの実測確認（Vercel Analyticsで?q=が落ちているか）／利用規約／特定商取引法表記の要否判断／Phase 1 UI設計
+- 中断理由: 2026-08-12に承認ダイアログと安全装置の不具合対応を優先したため（同日中に再開し、PR #58 として完了）
 
 ### [2026-08-12 依頼] APIキーの再発行と平文控えの削除（依頼者: ウエマツ）
 - 依頼原文の要旨: .claude/settings.local.json に平文で残っていたAPIキー2種類を再発行し、交換完了後に控えファイルを削除する
