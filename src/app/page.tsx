@@ -11,6 +11,7 @@ import AIExploreChat from '@/components/AIExploreChat'
 import MultiCityResults from '@/components/MultiCityResults'
 import AlertModal from '@/components/AlertModal'
 import OnboardingModal from '@/components/OnboardingModal'
+import TopGate from '@/components/TopGate'
 import type { CategorizedFlights, SearchMode, SearchQuery, MultiCityParsedQuery, MultiCitySearchResult, FlightResult, UnifiedQuery } from '@/types'
 import { sortFlights } from '@/lib/sorting'
 
@@ -207,8 +208,35 @@ export default function HomePage() {
 
   const [showOnboarding, setShowOnboarding] = useState(false)
 
+  // トップの入口（風景の帯＋Radiの問いかけ）を見せている間は false。
+  // 入口を押すと true になり、これまでの検索・相談の画面が出る。
+  const [entered, setEntered] = useState(false)
+
   const searchBarRef = useRef<SearchBarHandle>(null)
   const aiChatRef = useRef<AIChatHandle>(null)
+
+  // 入口から入るときに履歴を1つ積む。端末の「戻る」でトップに帰れるようにするため。
+  const enter = (target: 'search' | 'chat') => {
+    window.history.pushState({ tobiraEntered: true }, '')
+    setEntered(true)
+    if (target === 'chat') aiChatRef.current?.open()
+  }
+
+  const backToGate = () => {
+    window.history.back()
+  }
+
+  useEffect(() => {
+    const onPopState = () => {
+      const state = window.history.state as { tobiraEntered?: boolean } | null
+      if (!state?.tobiraEntered) {
+        setEntered(false)
+        aiChatRef.current?.close()
+      }
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
 
   const handleMultiCitySearch = async (query: MultiCityParsedQuery, rawQuery?: string) => {
     setIsMultiCityLoading(true)
@@ -283,6 +311,8 @@ export default function HomePage() {
     // LINE OAuth callback
     const lineUserId = params.get('line_user_id')
     if (lineUserId) {
+      // 共有URL・LINEからの復帰は目的が決まっているので、トップの入口は飛ばす
+      setEntered(true)
       const lineDisplayName = params.get('line_display_name') ?? ''
       try {
         const saved = sessionStorage.getItem('line_oauth_flight')
@@ -301,6 +331,7 @@ export default function HomePage() {
     const sel = params.get('sel')
     if (!q) return
 
+    setEntered(true)
     searchBarRef.current?.setQuery(q)
 
     if (sel) {
@@ -613,15 +644,36 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      {!entered && (
+        <TopGate
+          onChooseSearch={() => enter('search')}
+          onChooseChat={() => enter('chat')}
+        />
+      )}
+
+      {entered && (
+      <>
       <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100 sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-2">
-          <div className="flex items-center gap-2 text-indigo-700">
+          <button
+            type="button"
+            onClick={backToGate}
+            className="flex items-center gap-2 text-indigo-700"
+            aria-label="トップにもどる"
+          >
             <Plane size={22} style={{ transform: 'rotate(-45deg)' }} />
             <span className="text-xl font-extrabold tracking-tight">Tobira</span>
-          </div>
+          </button>
           <span className="text-xs text-gray-400 hidden sm:block">
             世界への扉を、あなたの手に。
           </span>
+          <button
+            type="button"
+            onClick={backToGate}
+            className="ml-auto text-xs text-gray-500 hover:text-indigo-600 border border-gray-200 hover:border-indigo-300 rounded-full px-3 py-1.5 transition-colors"
+          >
+            ← トップにもどる
+          </button>
         </div>
       </header>
 
@@ -781,22 +833,29 @@ export default function HomePage() {
           📝 使ってみた感想を教えてください
         </a>
       </div>
+      </>
+      )}
 
-
-{/* AI Chat — fixed position, always rendered */}
-      <AIChat
-        ref={aiChatRef}
-        query={lastQuery}
-        categorized={categorized}
-        onSearchQuery={handleChatSearch}
-        onExploreMode={(rawQuery) => {
-          searchBarRef.current?.setQuery(rawQuery)
-          handleExplore({ rawQuery })
-        }}
-      />
+{/* AI Chat — fixed position, always rendered.
+    トップの入口を見せている間は、相談ボタンを画面に出さないため包みを display:none にする。
+    ref から open() を呼べるようにマウントは保つ。 */}
+      <div className={entered ? undefined : 'hidden'}>
+        <AIChat
+          ref={aiChatRef}
+          query={lastQuery}
+          categorized={categorized}
+          onSearchQuery={handleChatSearch}
+          onExploreMode={(rawQuery) => {
+            searchBarRef.current?.setQuery(rawQuery)
+            handleExplore({ rawQuery })
+          }}
+        />
+      </div>
 
       {/* Onboarding modal + help button */}
-      <OnboardingModal forcedOpen={showOnboarding} onForcedClose={() => setShowOnboarding(false)} />
+      {entered && (
+        <OnboardingModal forcedOpen={showOnboarding} onForcedClose={() => setShowOnboarding(false)} />
+      )}
 
       {/* LINE OAuth callback: auto-open alert modal with pre-filled userId */}
       {lineCallbackFlight && lineCallbackUserId && (
