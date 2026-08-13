@@ -33,7 +33,6 @@ function HeroBand() {
 
   // 一度読み込んだ絵はブラウザのキャッシュから返るため、onLoad が発火しないことがある。
   // その場合に絵が透明のまま残らないよう、描画済みかどうかを見て自分で立てる。
-  /* eslint-disable-next-line react-hooks/set-state-in-effect */
   useEffect(() => { if (imgRef.current?.complete) setLoaded(true) }, [slot])
 
   return (
