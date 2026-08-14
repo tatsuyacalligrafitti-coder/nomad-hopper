@@ -216,10 +216,13 @@ export default function HomePage() {
   const aiChatRef = useRef<AIChatHandle>(null)
 
   // 入口から入るときに履歴を1つ積む。端末の「戻る」でトップに帰れるようにするため。
-  const enter = (target: 'search' | 'chat') => {
+  // chatMessage を渡すと、Radiが聞き出した条件を相談の最初の発言として送る。
+  const enter = (target: 'search' | 'chat', chatMessage?: string) => {
     window.history.pushState({ tobiraEntered: true }, '')
     setEntered(true)
-    if (target === 'chat') aiChatRef.current?.open()
+    if (target !== 'chat') return
+    if (chatMessage) aiChatRef.current?.openWithMessage(chatMessage)
+    else aiChatRef.current?.open()
   }
 
   const backToGate = () => {
@@ -647,7 +650,7 @@ export default function HomePage() {
       {!entered && (
         <TopGate
           onChooseSearch={() => enter('search')}
-          onChooseChat={() => enter('chat')}
+          onChooseChat={(message) => enter('chat', message)}
         />
       )}
 
@@ -852,9 +855,14 @@ export default function HomePage() {
         />
       </div>
 
-      {/* Onboarding modal + help button */}
+      {/* Onboarding modal + help button
+          玄関ではRadiがアテンドするため、挨拶モーダルは自分から出さない（中身は残す）。 */}
       {entered && (
-        <OnboardingModal forcedOpen={showOnboarding} onForcedClose={() => setShowOnboarding(false)} />
+        <OnboardingModal
+          disableAutoOpen
+          forcedOpen={showOnboarding}
+          onForcedClose={() => setShowOnboarding(false)}
+        />
       )}
 
       {/* LINE OAuth callback: auto-open alert modal with pre-filled userId */}

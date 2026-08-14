@@ -285,9 +285,15 @@ function PageChangelog({ entry }: { entry: typeof CHANGELOG_PAGES[number] }) {
 interface Props {
   forcedOpen?: boolean
   onForcedClose?: () => void
+  /**
+   * 初回訪問・更新時にこのモーダルを自分から開かない。
+   * トップページでは玄関のRadiがアテンドするため、挨拶モーダルは自動で出さない。
+   * 中身と「？」ボタンからの表示は残す（あとで別のページに置き直すため）。
+   */
+  disableAutoOpen?: boolean
 }
 
-export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
+export default function OnboardingModal({ forcedOpen, onForcedClose, disableAutoOpen }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [page, setPage] = useState(0)
   const [openReason, setOpenReason] = useState<OpenReason>(null)
@@ -297,6 +303,8 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
   // 直下の forcedOpen 側も、親からの明示的なオープン指示を内部stateへ橋渡しするもの。
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    if (disableAutoOpen) return
+
     const onboardingSeen = !!safeGetStorage(STORAGE_KEY)
     const updateSeen = safeGetStorage(UPDATE_STORAGE_KEY) === LATEST_UPDATE_VERSION
 
@@ -309,7 +317,7 @@ export default function OnboardingModal({ forcedOpen, onForcedClose }: Props) {
       setOpenReason('update')
       setIsOpen(true)
     }
-  }, [])
+  }, [disableAutoOpen])
 
   useEffect(() => {
     if (forcedOpen) {

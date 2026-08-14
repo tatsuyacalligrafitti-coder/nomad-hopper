@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plane, MapPin, MessageCircle } from 'lucide-react'
+import { Plane, MapPin, MessageCircle, CalendarDays, Wallet, ChevronLeft, Search } from 'lucide-react'
 
 type Slot = 'dawn' | 'day' | 'sunset' | 'night'
 
@@ -71,68 +71,304 @@ function HeroBand() {
   )
 }
 
+// ── Radi が聞き出す条件 ────────────────────────────────────────────────────────
+
+type Topic = 'dest' | 'when' | 'budget'
+
+const TOPICS: { key: Topic; choice: string; label: string; placeholder: string; icon: typeof MapPin }[] = [
+  { key: 'dest',   choice: '行き先が気になっている国・都市がある', label: '行き先（国名か都市名）', placeholder: '台北 / タイ / パリ', icon: MapPin },
+  { key: 'when',   choice: '行ける時期がだいたい決まっている',     label: 'いつ頃（月でもかまいません）', placeholder: '9月 / 年末 / 来年の春', icon: CalendarDays },
+  { key: 'budget', choice: '出せる予算が決まっている',             label: '予算（金額）', placeholder: '10万円 / 50000', icon: Wallet },
+]
+
+type Answers = Partial<Record<Topic, string>>
+
+// 数字だけで入れられたときに、そのまま文章に混ざらないよう整える
+function normalize(topic: Topic, raw: string): string {
+  const text = raw.trim()
+  if (topic === 'when' && /^\d{1,2}$/.test(text)) return `${Number(text)}月`
+  if (topic === 'budget' && /^[\d,]+$/.test(text)) {
+    const n = Number(text.replace(/,/g, ''))
+    if (Number.isFinite(n) && n > 0) return `${n.toLocaleString()}円`
+  }
+  return text
+}
+
+// 集まった条件を1つの文章に組み立てる。相談モードへの最初の発言になる。
+//   行き先＋予算        → 「台北に、10万円以内で行きたい」
+//   時期＋行き先        → 「9月に台北に行きたい」
+//   予算だけ            → 「どこかに、10万円以内で行きたい」
+export function buildMessage(answers: Answers): string {
+  const when = answers.when ? `${answers.when}に` : ''
+  const dest = `${answers.dest ?? 'どこか'}に`
+  const head = when + dest
+  return answers.budget
+    ? `${head}、${answers.budget}以内で行きたい`
+    : `${head}行きたい`
+}
+
+const GREETING = 'はじめまして。旅の参謀のRadiです。'
+const QUESTION = '旅の予定は、どこまで決まっていますか？'
+const VISITED_KEY = 'tobira_radi_greeted_v1'
+
+const ASK_LINE = '承知しました。決まっていることから教えてください。'
+const MORE_LINE = '他に決まっていることはありますか。なければ、これで探します。'
+
+// ask      = 2つの扉を出している
+// toSearch = 扉1。ひと言だけ言ってから検索の画面へ渡す
+// collect  = 扉2。決まっていることを1つずつ聞き出している
+type Mode = 'ask' | 'toSearch' | 'collect'
+
+// ── 画面の部品 ────────────────────────────────────────────────────────────────
+
+function RadiSays({ lines }: { lines: string[] }) {
+  return (
+    <div className="flex items-start gap-3 sm:gap-4">
+      {/* Radi の絵は public/radi/ のファイルを差し替えれば変わる */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/radi/normal.png"
+        alt="Radi"
+        width={512}
+        height={512}
+        className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-full bg-indigo-50"
+      />
+      <div className="mt-2 flex-1 space-y-2">
+        {lines.map((line, i) => (
+          <div
+            key={line}
+            className={`relative rounded-2xl bg-indigo-50 px-4 py-3 sm:px-5 sm:py-4 ${i === 0 ? 'rounded-tl-sm' : ''}`}
+          >
+            {i === 0 && (
+              <span
+                aria-hidden="true"
+                className="absolute -left-2 top-3 w-4 h-4 bg-indigo-50"
+                style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
+              />
+            )}
+            <p className={`font-bold text-gray-900 leading-snug ${lines.length > 1 && i === 0 ? 'text-base sm:text-lg' : 'text-lg sm:text-2xl'}`}>
+              {line}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ChoiceButton({
+  title, note, icon: Icon, onClick,
+}: { title: string; note?: string; icon: typeof MapPin; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left rounded-2xl border border-gray-200 bg-white px-5 py-5 min-h-[76px] shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-50/40 active:bg-indigo-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+    >
+      <span className="flex items-center gap-2 text-indigo-600">
+        <Icon size={18} className="shrink-0" />
+        <span className="text-base sm:text-lg font-bold text-gray-900">{title}</span>
+      </span>
+      {note && <span className="block mt-2 text-sm text-gray-500">{note}</span>}
+    </button>
+  )
+}
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-indigo-600 rounded-full border border-gray-200 hover:border-indigo-300 px-3 py-1.5 transition-colors"
+    >
+      <ChevronLeft size={16} />
+      ひとつ前にもどる
+    </button>
+  )
+}
+
+// ── 本体 ──────────────────────────────────────────────────────────────────────
+
 interface Props {
   onChooseSearch: () => void
-  onChooseChat: () => void
+  onChooseChat: (message: string) => void
 }
 
 export default function TopGate({ onChooseSearch, onChooseChat }: Props) {
+  // 名乗りは初回訪問だけ。端末に覚えさせる。判定はマウント後（SSRとずれないように）
+  const [greet, setGreet] = useState(false)
+  const [mode, setMode] = useState<Mode>('ask')
+  // 聞き出した内容と、聞いた順番。順番は「ひとつ前にもどる」でどこへ帰るかに使う
+  const [answers, setAnswers] = useState<Answers>({})
+  const [order, setOrder] = useState<Topic[]>([])
+  const [editing, setEditing] = useState<Topic | null>(null)
+  const [draft, setDraft] = useState('')
+
+  // 意図的なパターン: localStorage（訪問したことがあるか）というReact外部の状態を
+  // マウント後に読み取って表示を決める。SSRとずれないよう effect 内で行う。
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(VISITED_KEY)) {
+        setGreet(true)
+        localStorage.setItem(VISITED_KEY, 'true')
+      }
+    } catch {
+      // プライベートモード等で保存できないときは名乗らない（毎回出るのを避ける）
+    }
+  }, [])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // 扉1：ひと言だけ受けてから、今ある検索の画面へ渡す。
+  // 親が再描画されても待ち時間がやり直しにならないよう、渡し先はrefで持つ。
+  const searchHandoff = useRef(onChooseSearch)
+  useEffect(() => { searchHandoff.current = onChooseSearch }, [onChooseSearch])
+  useEffect(() => {
+    if (mode !== 'toSearch') return
+    const timer = setTimeout(() => searchHandoff.current(), 1200)
+    return () => clearTimeout(timer)
+  }, [mode])
+
+  const openInput = (topic: Topic) => {
+    setDraft(answers[topic] ?? '')
+    setEditing(topic)
+  }
+
+  const submitInput = (topic: Topic) => {
+    const value = normalize(topic, draft)
+    if (!value) return
+    setAnswers(prev => ({ ...prev, [topic]: value }))
+    setOrder(prev => (prev.includes(topic) ? prev : [...prev, topic]))
+    setDraft('')
+    setEditing(null)
+  }
+
+  // ひとつ前にもどる。
+  //   入力欄にいるとき → 選ぶ画面へ
+  //   選ぶ画面にいて、聞き出したものがあるとき → 直前に答えたものの入力欄へ（入れ直せる）
+  //   選ぶ画面にいて、何も聞き出していないとき → 2つの扉へ
+  const back = () => {
+    if (editing !== null) {
+      setEditing(null)
+      setDraft('')
+      return
+    }
+    const last = order[order.length - 1]
+    if (!last) {
+      setMode('ask')
+      return
+    }
+    setOrder(prev => prev.slice(0, -1))
+    setAnswers(prev => {
+      const next = { ...prev }
+      delete next[last]
+      return next
+    })
+    setDraft(answers[last] ?? '')
+    setEditing(last)
+  }
+
+  const remaining = TOPICS.filter(t => !answers[t.key])
+  const collectLine = order.length === 0 ? ASK_LINE : MORE_LINE
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <HeroBand />
 
       <div className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-        {/* Radi の問いかけ。絵は public/radi/ のファイルを差し替えれば変わる */}
-        <div className="flex items-start gap-3 sm:gap-4">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/radi/normal.png"
-            alt="Radi"
-            width={512}
-            height={512}
-            className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-full bg-indigo-50"
-          />
-          <div className="relative mt-2 flex-1 rounded-2xl rounded-tl-sm bg-indigo-50 px-4 py-3 sm:px-5 sm:py-4">
-            <span
-              aria-hidden="true"
-              className="absolute -left-2 top-3 w-4 h-4 bg-indigo-50"
-              style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
-            />
-            <p className="text-lg sm:text-2xl font-bold text-gray-900 leading-snug">
-              旅の予定は、どこまで決まっていますか？
-            </p>
-          </div>
-        </div>
+        {mode === 'ask' && (
+          <>
+            <RadiSays lines={greet ? [GREETING, QUESTION] : [QUESTION]} />
+            <div className="mt-6 sm:mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <ChoiceButton
+                title="行き先が決まっている"
+                note="便を探しにいく"
+                icon={MapPin}
+                onClick={() => setMode('toSearch')}
+              />
+              <ChoiceButton
+                title="まだ決めていない"
+                note="Radiと話しながら決める"
+                icon={MessageCircle}
+                onClick={() => setMode('collect')}
+              />
+            </div>
+          </>
+        )}
 
-        <div className="mt-6 sm:mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <button
-            type="button"
-            onClick={onChooseSearch}
-            className="text-left rounded-2xl border border-gray-200 bg-white px-5 py-5 min-h-[104px] shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-50/40 active:bg-indigo-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-          >
-            <span className="flex items-center gap-2 text-indigo-600">
-              <MapPin size={18} />
-              <span className="text-base sm:text-lg font-bold text-gray-900">
-                行き先が決まっている
-              </span>
-            </span>
-            <span className="block mt-2 text-sm text-gray-500">便を探しにいく</span>
-          </button>
+        {mode === 'toSearch' && (
+          <RadiSays lines={['承知しました。行き先と、日程を教えてください。']} />
+        )}
 
-          <button
-            type="button"
-            onClick={onChooseChat}
-            className="text-left rounded-2xl border border-gray-200 bg-white px-5 py-5 min-h-[104px] shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-50/40 active:bg-indigo-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-          >
-            <span className="flex items-center gap-2 text-indigo-600">
-              <MessageCircle size={18} />
-              <span className="text-base sm:text-lg font-bold text-gray-900">
-                まだ決めていない
-              </span>
-            </span>
-            <span className="block mt-2 text-sm text-gray-500">Radiと話しながら決める</span>
-          </button>
-        </div>
+        {mode === 'collect' && editing !== null && (
+          <>
+            <RadiSays lines={[collectLine]} />
+            <form
+              className="mt-6 sm:mt-8"
+              onSubmit={e => { e.preventDefault(); submitInput(editing) }}
+            >
+              <label
+                htmlFor="radi-input"
+                className="block text-sm font-semibold text-gray-500 mb-2"
+              >
+                {TOPICS.find(t => t.key === editing)!.label}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="radi-input"
+                  autoFocus
+                  value={draft}
+                  onChange={e => setDraft(e.target.value)}
+                  placeholder={TOPICS.find(t => t.key === editing)!.placeholder}
+                  inputMode={editing === 'budget' ? 'numeric' : 'text'}
+                  className="flex-1 min-w-0 rounded-2xl border border-gray-200 bg-white px-4 py-4 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                />
+                <button
+                  type="submit"
+                  disabled={!draft.trim()}
+                  className="shrink-0 rounded-2xl bg-indigo-600 px-5 py-4 text-base font-bold text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-200 disabled:text-gray-400"
+                >
+                  決定
+                </button>
+              </div>
+            </form>
+            <div className="mt-6">
+              <BackButton onClick={back} />
+            </div>
+          </>
+        )}
+
+        {mode === 'collect' && editing === null && (
+          <>
+            <RadiSays lines={[collectLine]} />
+
+            <div className="mt-6 sm:mt-8 space-y-3">
+              {remaining.map(t => (
+                <ChoiceButton key={t.key} title={t.choice} icon={t.icon} onClick={() => openInput(t.key)} />
+              ))}
+
+              {order.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onChooseChat(buildMessage(answers))}
+                  className="w-full rounded-2xl bg-indigo-600 px-5 py-5 text-left shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                >
+                  <span className="flex items-center gap-2 text-white">
+                    <Search size={18} className="shrink-0" />
+                    <span className="text-base sm:text-lg font-bold">これで探す</span>
+                  </span>
+                  <span className="block mt-2 text-sm text-indigo-100">
+                    Radiに伝えること：{buildMessage(answers)}
+                  </span>
+                </button>
+              )}
+            </div>
+
+            <div className="mt-6">
+              <BackButton onClick={back} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
