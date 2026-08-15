@@ -517,3 +517,4 @@ Claude Code（このセッション）と、web版の本社チャット・各課
 - [2026-08-14] Driveの控えは書き込み直後だと読み取り側に古い版が返る。日時とサイズだけで判断せず中身の1行を読んで確かめる
 - [2026-08-14] Claude CodeからDriveに書けないのは起動中のClaudeアプリにフルディスクアクセスが効いていないため。Claudeを再起動して実測で確かめる
   ※[2026-08-14] Claude再起動後に実測。読み書き・上書き・削除の5つとも成功
+- [2026-08-15] ブラウザ承認の許可先は ~/Library/Application Support/Claude/claude_desktop_config.json の launchPreviewAllowedOrigins に origin 単位で保存される。.claude 配下ではないため予告は不要
