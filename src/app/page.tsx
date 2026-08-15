@@ -347,7 +347,6 @@ export default function HomePage() {
     if (!q) return
 
     setEntered(true)
-    searchBarRef.current?.setQuery(q)
 
     if (sel) {
       const indices = sel.split(',').map(n => parseInt(n, 10) || 0)
@@ -356,22 +355,11 @@ export default function HomePage() {
       setPendingSelections(selections)
     }
 
-    fetch('/api/parse-query', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: q }),
-    })
-      .then(res => res.json())
-      .then((uq: UnifiedQuery) => {
-        if (!isValidUnified(uq)) return
-        if (uq.type === 'multi-city') {
-          handleMultiCitySearch(unifiedToMultiCity(uq))
-        } else {
-          handleSearch(unifiedToSearchQuery(uq, q))
-        }
-      })
-      .catch(() => {})
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // SearchBar は entered になって初めて描かれるため、ここで setQuery を呼んでも
+    // ref がまだ無く、検索バーが空のままになる（条件のタグも出ない）。
+    // 扉1のフォームと同じ受け渡しに寄せ、検索画面が描かれてから handleChatSearch に渡す。
+    // handleChatSearch が「検索バーへの文字入れ・日付解釈・検索の実行」をまとめて行う。
+    setPendingSearchSentence(q)
   }, [])
   /* eslint-enable react-hooks/set-state-in-effect */
 
