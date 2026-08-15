@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, X, Search, Pencil } from 'lucide-react'
+import { useState, Fragment } from 'react'
+import { Plus, X, Search, Pencil, CalendarDays } from 'lucide-react'
+import RangeCalendar, { todayIso, jpDate } from './RangeCalendar'
 
 export interface Leg {
   dest: string
@@ -45,12 +46,6 @@ export function buildSearchSentence(values: FormValues, today: Date = new Date()
   return cities.map((city, i) => (dates[i] ? `${fd(dates[i])} ${city}` : city)).join('→')
 }
 
-const todayIso = () => {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
 const fieldClass =
   'w-full rounded-2xl border border-gray-200 bg-white px-4 py-4 text-base text-gray-900 ' +
   'placeholder:text-gray-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
@@ -66,18 +61,37 @@ export default function SearchForm({ onSubmitSentence, onSwitchToText }: Props) 
   const [origin, setOrigin] = useState('')
   const [legs, setLegs] = useState<Leg[]>([{ dest: '', date: '' }])
   const [returnDate, setReturnDate] = useState('')
+  // どのカレンダーを開いているか。'trip' は往路と復路をまとめて選ぶもの、
+  // 数字は経由地の区間（その区間を出発する日）
+  const [openCalendar, setOpenCalendar] = useState<'trip' | number | null>(null)
 
   const min = todayIso()
   const values: FormValues = { origin, legs, returnDate }
   const ready = origin.trim() !== '' && legs.every(l => l.dest.trim() !== '' && l.date !== '')
-  const lastLegDate = legs[legs.length - 1]?.date || min
 
   const updateLeg = (i: number, patch: Partial<Leg>) =>
     setLegs(prev => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
 
   const addLeg = () => setLegs(prev => [...prev, { dest: '', date: '' }])
 
-  const removeLeg = (i: number) => setLegs(prev => prev.filter((_, idx) => idx !== i))
+  const removeLeg = (i: number) => {
+    setLegs(prev => prev.filter((_, idx) => idx !== i))
+    setOpenCalendar(null)
+  }
+
+  // 往路（1つめの区間の出発日）と復路（帰着日）を1つのカレンダーで受ける
+  const setTripRange = (start: string, end: string) => {
+    updateLeg(0, { date: start })
+    setReturnDate(end)
+    // 往路を選び直したら、後ろの区間で辻褄が合わなくなったものは消す
+    setLegs(prev => prev.map((l, idx) => (idx > 0 && l.date && l.date < start ? { ...l, date: '' } : l)))
+  }
+
+  const tripLabel = !legs[0].date
+    ? '日付を選ぶ'
+    : returnDate
+      ? `${jpDate(legs[0].date)} 〜 ${jpDate(returnDate)}`
+      : `${jpDate(legs[0].date)}（片道）`
 
   return (
     <form
@@ -101,7 +115,8 @@ export default function SearchForm({ onSubmitSentence, onSwitchToText }: Props) 
         </div>
 
         {legs.map((leg, i) => (
-          <div key={i} className="rounded-2xl bg-gray-50 p-4 space-y-4">
+          <Fragment key={i}>
+          <div className="rounded-2xl bg-gray-50 p-4 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-gray-500">
                 {legs.length === 1 ? '目的地' : i === 0 ? '目的地（1つめ）' : `経由して行く先（${i + 1}つめ）`}
@@ -126,20 +141,63 @@ export default function SearchForm({ onSubmitSentence, onSwitchToText }: Props) 
               className={fieldClass}
             />
 
-            <div>
-              <label htmlFor={`form-date-${i}`} className={labelClass}>
-                {i === 0 ? '出発日' : `${legs[i - 1].dest.trim() || '前の行き先'}を出る日`}
-              </label>
-              <input
-                id={`form-date-${i}`}
-                type="date"
-                value={leg.date}
-                min={i === 0 ? min : legs[i - 1].date || min}
-                onChange={e => updateLeg(i, { date: e.target.value })}
-                className={fieldClass}
-              />
-            </div>
+            {/* 1つめの区間の日付は、下の「日程」カレンダーで復路とまとめて選ぶ。
+                2つめ以降（経由地）は、その区間を出発する日を同じカレンダーで1日だけ選ぶ */}
+            {i > 0 && (
+              <div>
+                <span className={labelClass}>
+                  {legs[i - 1].dest.trim() || '前の行き先'}を出る日
+                </span>
+                <button
+                  type="button"
+                  id={`form-date-${i}`}
+                  onClick={() => setOpenCalendar(openCalendar === i ? null : i)}
+                  className={`${fieldClass} text-left flex items-center gap-2 ${leg.date ? 'text-gray-900' : 'text-gray-400'}`}
+                >
+                  <CalendarDays size={18} className="shrink-0 text-indigo-500" />
+                  {leg.date ? jpDate(leg.date) : '日付を選ぶ'}
+                </button>
+                {openCalendar === i && (
+                  <RangeCalendar
+                    mode="single"
+                    start={leg.date}
+                    end=""
+                    min={legs[i - 1].date || min}
+                    max={returnDate || undefined}
+                    onChange={(s) => updateLeg(i, { date: s })}
+                    onDone={() => setOpenCalendar(null)}
+                  />
+                )}
+              </div>
+            )}
           </div>
+
+          {/* 1つめの行き先のすぐ下に日程を置く。経由地の欄はそのあとに続く */}
+          {i === 0 && (
+            <div>
+              <span className={labelClass}>日程（帰りを選ばなければ片道）</span>
+              <button
+                type="button"
+                id="form-trip-dates"
+                onClick={() => setOpenCalendar(openCalendar === 'trip' ? null : 'trip')}
+                className={`${fieldClass} text-left flex items-center gap-2 ${legs[0].date ? 'text-gray-900' : 'text-gray-400'}`}
+              >
+                <CalendarDays size={18} className="shrink-0 text-indigo-500" />
+                {tripLabel}
+              </button>
+              {openCalendar === 'trip' && (
+                <RangeCalendar
+                  mode="range"
+                  start={legs[0].date}
+                  end={returnDate}
+                  min={min}
+                  onChange={setTripRange}
+                  onDone={() => setOpenCalendar(null)}
+                />
+              )}
+            </div>
+          )}
+          </Fragment>
         ))}
 
         <button
@@ -150,20 +208,6 @@ export default function SearchForm({ onSubmitSentence, onSwitchToText }: Props) 
           <Plus size={16} />
           経由地を追加
         </button>
-
-        <div>
-          <label htmlFor="form-return" className={labelClass}>
-            帰着日（選ばなければ片道）
-          </label>
-          <input
-            id="form-return"
-            type="date"
-            value={returnDate}
-            min={lastLegDate}
-            onChange={e => setReturnDate(e.target.value)}
-            className={fieldClass}
-          />
-        </div>
       </div>
 
       <button
