@@ -58,7 +58,10 @@ const MODE_HINTS: Record<SearchMode, string> = {
 
 function unifiedToSearchQuery(uq: UnifiedQuery, rawQuery: string): SearchQuery {
   const dep = uq.legs[0]
-  const ret = uq.type === 'round-trip' ? uq.legs.find(l => l.date_role === 'arrival') : undefined
+  // LLM returns date_role:'departure' for both legs of round-trip; fallback to legs[1]
+  // （本番で実測: type は round-trip なのに2区間とも 'departure' で返る。印だけを見ると
+  //   帰りの日付が落ち、往復指定でも片道価格になる。SearchBar 側と同じ扱いに揃える）
+  const ret = uq.legs.find(l => l.date_role === 'arrival') ?? (uq.type === 'round-trip' ? uq.legs[1] : undefined)
   return {
     origin: dep.origin,
     destination: dep.destination,
