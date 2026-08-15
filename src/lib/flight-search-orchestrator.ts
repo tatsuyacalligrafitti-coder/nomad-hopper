@@ -75,6 +75,7 @@ export async function searchAllProviders(
         query.departureDate,
         cheapest.totalPrice,
         new Date().toISOString(),
+        query.returnDate,
       )
     } catch (err) {
       console.warn('[orchestrator] 価格履歴の記録に失敗（検索は継続）:', err instanceof Error ? err.message : String(err))

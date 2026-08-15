@@ -128,10 +128,22 @@ export interface PriceLogPoint {
   d: string    // observation date (JST, YYYY-MM-DD)
   dep: string  // departure date (YYYY-MM-DD)
   p: number    // observed cheapest price
+  ret?: string // return date (YYYY-MM-DD) — present only on round-trip observations
 }
 
-const PRICEHIST_LOG_KEY = (origin: string, destination: string) =>
-  `pricehist:log:${origin}-${destination}`
+// One-way fares and round-trip totals are different products, so they get separate
+// keys. Pooled together, a round-trip total always lands at the expensive end of a
+// one-way-dominated distribution and the position we state is simply wrong.
+// The one-way key name is deliberately unchanged: the observations accumulated
+// since 2026-07-11 keep being read by exactly the same key.
+const PRICEHIST_LOG_KEY = (origin: string, destination: string, roundTrip: boolean) =>
+  roundTrip ? `pricehist:log:rt:${origin}-${destination}` : `pricehist:log:${origin}-${destination}`
+
+// Treat an absent/empty return date as one-way, so a form sending "" never lands in
+// the round-trip bucket. Every trip-type decision in this file goes through here.
+function normalizeReturnDate(returnDate?: string | null): string | undefined {
+  return returnDate && returnDate.length > 0 ? returnDate : undefined
+}
 
 // Safety valve against unbounded growth. Not expected to be reached in practice
 // (2 routes × 2 offsets × daily ≈ years of runway), but we never let a key grow
@@ -154,6 +166,7 @@ export async function recordPriceHistory(
   departureDate: string,
   price: number,
   timestamp: string,
+  returnDate?: string,
 ): Promise<void> {
   const redis = getRedis()
   if (!redis) {
@@ -188,11 +201,16 @@ export async function recordPriceHistory(
   // undoes the departure-keyed record above. Command budget: GET + SET (the two
   // commands this persistent log adds per recording).
   try {
-    const logKey = PRICEHIST_LOG_KEY(origin, destination)
+    const ret = normalizeReturnDate(returnDate)
+    const logKey = PRICEHIST_LOG_KEY(origin, destination, ret != null)
     const existingLog = (await redis.get<PriceLogPoint[]>(logKey)) ?? []
-    // One sample per (observation date, departure date): overwrite, else append.
-    const filteredLog = existingLog.filter((e) => !(e.d === date && e.dep === departureDate))
-    filteredLog.push({ d: date, dep: departureDate, p: price })
+    // One sample per (observation date, departure date, return date): overwrite, else
+    // append. One-way points carry no `ret`, so undefined === undefined keeps the
+    // pre-existing two-field dedup behaviour for the one-way key unchanged.
+    const filteredLog = existingLog.filter(
+      (e) => !(e.d === date && e.dep === departureDate && e.ret === ret),
+    )
+    filteredLog.push(ret ? { d: date, dep: departureDate, p: price, ret } : { d: date, dep: departureDate, p: price })
     // Safety valve: keep the newest PRICEHIST_LOG_MAX, dropping oldest first.
     const capped =
       filteredLog.length > PRICEHIST_LOG_MAX
@@ -220,16 +238,18 @@ export async function getPriceHistory(
   }
 }
 
-// Read the persistent per-route log (all departure dates). Single GET; returns []
-// when Redis is unavailable or the key doesn't exist yet.
+// Read the persistent per-route log for one trip type (all departure dates). Single
+// GET; returns [] when Redis is unavailable or the key doesn't exist yet — which is
+// also what the round-trip key returns until observations start accumulating.
 export async function getPriceLog(
   origin: string,
   destination: string,
+  roundTrip = false,
 ): Promise<PriceLogPoint[]> {
   const redis = getRedis()
   if (!redis) return []
   try {
-    return (await redis.get<PriceLogPoint[]>(PRICEHIST_LOG_KEY(origin, destination))) ?? []
+    return (await redis.get<PriceLogPoint[]>(PRICEHIST_LOG_KEY(origin, destination, roundTrip))) ?? []
   } catch (err) {
     console.error('[alert-store] get price log error:', err instanceof Error ? err.message : String(err))
     return []

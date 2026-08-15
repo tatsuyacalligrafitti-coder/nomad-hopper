@@ -14,21 +14,42 @@ export const WATCHLIST_ROUTES: { origin: string; destination: string }[] = [
 // Days ahead of "now" to sample each route at (captures both near and mid-term).
 export const WATCHLIST_OFFSETS_DAYS: number[] = [7, 30]
 
-// One query per route × offset. Shape matches the cron's alert query
-// (passengers 1 / economy / one-way) so both flow through the same pipeline.
+// Nights between departure and return for the round-trip observation.
+//
+// Deliberately a fixed number of NIGHTS, not a fixed return date: every morning's
+// round-trip observation is then the same product — "a 7-night round trip departing
+// N days out" — so the accumulated points stay comparable with each other, which is
+// the whole premise of positioning a price within them. A fixed return date would
+// shorten the trip by one night every morning and quietly compare unlike things.
+//
+// 7 nights because the two departure offsets (7 and 30 days out) are leisure
+// booking horizons, where a one-week trip is the ordinary shape, and because it
+// keeps the return inside the same booking window as the departure.
+export const WATCHLIST_RETURN_NIGHTS = 7
+
+// Two queries per route × offset: one-way and round-trip. Both trip types must be
+// observed daily, because each is positioned against its own history and a bucket
+// nothing writes to never reaches the minimum sample count. Shape otherwise matches
+// the cron's alert query (passengers 1 / economy) so all flow through one pipeline.
 export function buildWatchlistQueries(now: Date): SearchQuery[] {
   const DAY_MS = 24 * 60 * 60 * 1000
   const queries: SearchQuery[] = []
   for (const route of WATCHLIST_ROUTES) {
     for (const offset of WATCHLIST_OFFSETS_DAYS) {
-      queries.push({
+      const departureDate = toJstDateString(now.getTime() + offset * DAY_MS)
+      const returnDate = toJstDateString(
+        now.getTime() + (offset + WATCHLIST_RETURN_NIGHTS) * DAY_MS,
+      )
+      const base = {
         origin: route.origin,
         destination: route.destination,
-        departureDate: toJstDateString(now.getTime() + offset * DAY_MS),
+        departureDate,
         passengers: 1,
-        cabinClass: 'economy',
+        cabinClass: 'economy' as const,
         rawQuery: '',
-      })
+      }
+      queries.push(base)
+      queries.push({ ...base, returnDate })
     }
   }
   return queries

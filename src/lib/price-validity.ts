@@ -6,14 +6,20 @@ import { toJstDateString } from '@/lib/date-jst'
 // route, drawn from the persistent per-route log (pricehist:log:*). This states a
 // position within observed history — it is NOT a forecast and never a guarantee.
 //
+// Like is compared with like: a one-way search is positioned against one-way
+// observations, a round-trip search against round-trip totals. They are separate
+// keys, so passing a returnDate switches the whole comparison set. Until round-trip
+// observations reach MIN_SAMPLES the round-trip log is short and we return null —
+// which is exactly the "stay silent on round trips" behaviour we want meanwhile.
+//
 // Returns null (→ UI shows nothing) when we shouldn't speak:
-//   a. no observations for the route
+//   a. no observations for the route and trip type
 //   b. fewer than MIN_SAMPLES observations (too little data to position honestly)
 //   c. the newest observation is STALE_AFTER_DAYS or more old (data too stale)
 //
-// Comparison is against ALL observations for the route regardless of departure
-// date. The log keeps `dep` per point so future work can stratify by departure;
-// this first version deliberately does not.
+// Within a trip type, comparison is against ALL observations for the route
+// regardless of departure date. Each point keeps `dep` (and `ret` on round trips)
+// so future work can stratify by departure or trip length; this version does not.
 
 const MIN_SAMPLES = 5
 const STALE_AFTER_DAYS = 14
@@ -31,8 +37,10 @@ export async function assessPriceValidity(
   origin: string,
   destination: string,
   currentPrice: number,
+  returnDate?: string,
 ): Promise<ValidityNote | null> {
-  const log = await getPriceLog(origin, destination)
+  const roundTrip = Boolean(returnDate && returnDate.length > 0)
+  const log = await getPriceLog(origin, destination, roundTrip)
 
   // Keep only well-formed points.
   const points = log.filter(

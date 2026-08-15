@@ -101,29 +101,35 @@ export async function GET(request: NextRequest) {
   const watchlistErrors: string[] = []
 
   for (const query of watchlistQueries) {
+    // One-way and round-trip entries share origin/destination/departureDate, so the
+    // trip type has to appear in the log line or the two are indistinguishable.
+    const label = `${query.origin}→${query.destination} ${query.departureDate}${query.returnDate ? `/${query.returnDate} 往復` : ' 片道'}`
     try {
       watchlistChecked++
       const { flights } = await searchAllProviders(query)
       if (flights.length === 0) {
-        console.log(`[cron] watchlist ${query.origin}→${query.destination} ${query.departureDate}: 0件、スキップ`)
+        console.log(`[cron] watchlist ${label}: 0件、スキップ`)
         continue
       }
       const lowest = flights.reduce(
         (min, f) => (f.totalPrice < min.totalPrice ? f : min),
         flights[0],
       )
-      // Record only — watchlist entries never trigger notifications.
+      // Record only — watchlist entries never trigger notifications. returnDate is
+      // set on the round-trip half of the watchlist and routes the observation to
+      // the round-trip log; the one-way half leaves it undefined.
       await recordPriceHistory(
         query.origin,
         query.destination,
         query.departureDate,
         lowest.totalPrice,
         nowIso,
+        query.returnDate,
       )
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[cron] watchlist ${query.origin}→${query.destination} ${query.departureDate} エラー:`, msg)
-      watchlistErrors.push(`${query.origin}-${query.destination}-${query.departureDate}: ${msg}`)
+      console.error(`[cron] watchlist ${label} エラー:`, msg)
+      watchlistErrors.push(`${label}: ${msg}`)
     }
   }
 
