@@ -133,6 +133,16 @@ export default function DetourGame({ defaultMonth }: { defaultMonth: string }) {
         <p className="text-xs text-gray-500">片道で比べます。大人1名・エコノミー。</p>
       </form>
 
+      {/* Directly under the form and never conditional: the map is the ground the
+          page stands on, so it must not appear and disappear with the result. It
+          draws whatever the last answer gave us — a detour, a direct hop, or
+          nothing yet. */}
+      <DetourMap
+        origin={result?.origin}
+        hub={outcome?.status === 'ok' ? outcome.plan.hub : null}
+        destination={result?.destination}
+      />
+
       {error && (
         <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>
       )}
@@ -209,12 +219,6 @@ export default function DetourGame({ defaultMonth }: { defaultMonth: string }) {
               行く国がひとつ増えたのに、値段は下がりました。
             </p>
           </div>
-
-          <DetourMap
-            origin={result.origin}
-            hub={outcome.plan.hub}
-            destination={result.destination}
-          />
 
           <div className="grid gap-3 sm:grid-cols-2">
             <LegCard leg={outcome.plan.first} label={`1本目 ${result.origin.city} → ${outcome.plan.hub.city}`} />
