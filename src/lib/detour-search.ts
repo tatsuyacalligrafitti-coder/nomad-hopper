@@ -40,8 +40,20 @@ interface CheapEntry {
 /** All cached fares from `origin`, keyed by destination IATA. */
 type FareTable = Map<string, CheapEntry[]>
 
-async function fetchCheap(origin: string, destination: string | null, month: string): Promise<FareTable> {
-  if (!TOKEN) return new Map()
+/**
+ * `reachable: false` means the price service itself did not answer (rejected
+ * token, outage). That is a very different thing from "this route has no cached
+ * fares", and the two must not collapse into the same message on screen.
+ */
+interface FareLookup {
+  reachable: boolean
+  table: FareTable
+}
+
+const UNREACHABLE: FareLookup = { reachable: false, table: new Map() }
+
+async function fetchCheap(origin: string, destination: string | null, month: string): Promise<FareLookup> {
+  if (!TOKEN) return UNREACHABLE
 
   const params = new URLSearchParams({
     origin,
@@ -55,17 +67,15 @@ async function fetchCheap(origin: string, destination: string | null, month: str
   try {
     const res = await fetch(`${API}?${params}`, { next: { revalidate: 3600 } })
     if (!res.ok) {
-      // Log the status: an empty result and a rejected token look identical to
-      // the caller, and only one of them is a configuration problem.
       console.warn(`[detour] ${origin}→${destination ?? '*'} ${month}: HTTP ${res.status}`)
-      return new Map()
+      return UNREACHABLE
     }
     json = await res.json()
   } catch (err) {
     console.warn('[detour] 価格の取得に失敗:', err instanceof Error ? err.message : String(err))
-    return new Map()
+    return UNREACHABLE
   }
-  if (!json.success || !json.data) return new Map()
+  if (!json.success || !json.data) return { reachable: true, table: new Map() }
 
   const table: FareTable = new Map()
   for (const [dest, buckets] of Object.entries(json.data)) {
@@ -74,7 +84,7 @@ async function fetchCheap(origin: string, destination: string | null, month: str
     )
     if (entries.length > 0) table.set(dest.toUpperCase(), entries)
   }
-  return table
+  return { reachable: true, table }
 }
 
 /** Run `jobs` with a bounded number in flight; failures resolve to null. */
@@ -171,11 +181,15 @@ export async function findDetour(
 
   // One call gives every cached fare out of `from`: the direct fare and most of
   // the first legs at once. Anything missing is filled in individually below.
-  const fromTable = await fetchCheap(from, null, month)
+  const fromLookup = await fetchCheap(from, null, month)
+  if (!fromLookup.reachable) return { status: 'unavailable', month }
+  const fromTable = fromLookup.table
 
   let directEntries = fromTable.get(to)
   if (!directEntries) {
-    directEntries = (await fetchCheap(from, to, month)).get(to)
+    const retry = await fetchCheap(from, to, month)
+    if (!retry.reachable) return { status: 'unavailable', month }
+    directEntries = retry.table.get(to)
   }
   const directPick = directEntries ? pickEntry(directEntries) : null
   if (!directPick) return { status: 'no-direct', month }
@@ -187,14 +201,14 @@ export async function findDetour(
   const firstLegJobs = hubs.map((h) => async () => {
     const cached = fromTable.get(h.iata)
     if (cached) return cached
-    return (await fetchCheap(from, h.iata, month)).get(h.iata) ?? null
+    return (await fetchCheap(from, h.iata, month)).table.get(h.iata) ?? null
   })
   const firstLegs = await pooled(firstLegJobs, CONCURRENCY)
 
   // Second legs always need their own call — they start somewhere else.
   const secondLegJobs = hubs.map((h, i) => async () => {
     if (!firstLegs[i]) return null // no first leg → the pair can't exist
-    return (await fetchCheap(h.iata, to, month)).get(to) ?? null
+    return (await fetchCheap(h.iata, to, month)).table.get(to) ?? null
   })
   const secondLegs = await pooled(secondLegJobs, CONCURRENCY)
 

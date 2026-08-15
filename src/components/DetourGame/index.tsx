@@ -138,8 +138,9 @@ export default function DetourGame({ defaultMonth }: { defaultMonth: string }) {
       )}
 
       {outcome?.status === 'unavailable' && (
-        <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
-          いまは価格データを取得できませんでした。時間をおいてお試しください。
+        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          価格を提供しているサービスに接続できませんでした。ルートや時期の問題ではありません。
+          設定側の確認が必要です。
         </p>
       )}
 
