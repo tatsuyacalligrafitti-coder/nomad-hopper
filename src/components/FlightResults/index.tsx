@@ -379,7 +379,17 @@ export default function FlightResults({ categorized, isLoading, error, query, mo
               destination={query?.destination}
             />
           )}
-          {categorized!.validityNote && <ValidityNoteBox note={categorized!.validityNote} />}
+          {/* 位置づけの帯は片道のときだけ出す。
+              価格履歴（pricehist:log:*）には片道価格と往復合計が、種類の印なしで
+              同じ入れ物に記録されている。往復合計をその分布に当てると必ず高い側に
+              寄り、実態とかけ離れた位置づけになる。
+              （本番実測 2026-08-15: HND-HAN の同一の71点に対し、片道 ¥38,375 は
+                「安い方から13%」、往復合計 ¥80,631 は「高い方から1%」）
+              種類ごとに記録・比較を分ける対応が入るまでは、根拠のない位置づけを
+              見せずに黙る。判定は価格ラベルの片道/往復と同じ query.returnDate を使う。 */}
+          {!query?.returnDate && categorized!.validityNote && (
+            <ValidityNoteBox note={categorized!.validityNote} />
+          )}
           {CATEGORIES.map((cfg) => (
             <CategorySection
               key={cfg.key}
