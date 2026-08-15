@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Plane, MapPin, MessageCircle, CalendarDays, Wallet, ChevronLeft, Search } from 'lucide-react'
+import SearchForm from './SearchForm'
 
 type Slot = 'dawn' | 'day' | 'sunset' | 'night'
 
@@ -76,12 +77,29 @@ function HeroBand() {
 type Topic = 'dest' | 'when' | 'budget'
 
 const TOPICS: { key: Topic; choice: string; label: string; placeholder: string; icon: typeof MapPin }[] = [
-  { key: 'dest',   choice: '行き先が気になっている国・都市がある', label: '行き先（国名か都市名）', placeholder: '台北 / タイ / パリ', icon: MapPin },
-  { key: 'when',   choice: '行ける時期がだいたい決まっている',     label: 'いつ頃（月でもかまいません）', placeholder: '9月 / 年末 / 来年の春', icon: CalendarDays },
-  { key: 'budget', choice: '出せる予算が決まっている',             label: '予算（金額）', placeholder: '10万円 / 50000', icon: Wallet },
+  { key: 'dest',   choice: '行きたい国・都市がある',   label: '行き先（国名か都市名）', placeholder: '台北 / タイ / パリ', icon: MapPin },
+  { key: 'when',   choice: '時期がだいたい決まっている', label: '行けそうな月', placeholder: '', icon: CalendarDays },
+  { key: 'budget', choice: '予算が決まっている',       label: '予算（金額）', placeholder: '10万円 / 50000', icon: Wallet },
 ]
 
-type Answers = Partial<Record<Topic, string>>
+// origin は「行き先」を答えるときに一緒に聞く出発地。空のまま進めてよい
+type Answers = Partial<Record<Topic | 'origin', string>>
+
+// 今月から12ヶ月分。年が変わるぶんは年も表に出す
+function nextMonths(today: Date = new Date()): { label: string; sub: string; value: string }[] {
+  const list = []
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(today.getFullYear(), today.getMonth() + i, 1)
+    const y = d.getFullYear()
+    const m = d.getMonth() + 1
+    list.push({
+      label: `${m}月`,
+      sub: `${y}年`,
+      value: y === today.getFullYear() ? `${m}月` : `${y}年${m}月`,
+    })
+  }
+  return list
+}
 
 // 数字だけで入れられたときに、そのまま文章に混ざらないよう整える
 function normalize(topic: Topic, raw: string): string {
@@ -96,11 +114,13 @@ function normalize(topic: Topic, raw: string): string {
 
 // 集まった条件を1つの文章に組み立てる。相談モードへの最初の発言になる。
 //   行き先＋予算        → 「台北に、10万円以内で行きたい」
+//   出発地＋行き先＋予算 → 「静岡から台北に、10万円以内で行きたい」
 //   時期＋行き先        → 「9月に台北に行きたい」
 //   予算だけ            → 「どこかに、10万円以内で行きたい」
 export function buildMessage(answers: Answers): string {
   const when = answers.when ? `${answers.when}に` : ''
-  const dest = `${answers.dest ?? 'どこか'}に`
+  const from = answers.origin ? `${answers.origin}から` : ''
+  const dest = `${from}${answers.dest ?? 'どこか'}に`
   const head = when + dest
   return answers.budget
     ? `${head}、${answers.budget}以内で行きたい`
@@ -191,10 +211,11 @@ function BackButton({ onClick }: { onClick: () => void }) {
 
 interface Props {
   onChooseSearch: () => void
+  onSearchSentence: (sentence: string) => void
   onChooseChat: (message: string) => void
 }
 
-export default function TopGate({ onChooseSearch, onChooseChat }: Props) {
+export default function TopGate({ onChooseSearch, onSearchSentence, onChooseChat }: Props) {
   // 名乗りは初回訪問だけ。端末に覚えさせる。判定はマウント後（SSRとずれないように）
   const [greet, setGreet] = useState(false)
   const [mode, setMode] = useState<Mode>('ask')
@@ -203,6 +224,7 @@ export default function TopGate({ onChooseSearch, onChooseChat }: Props) {
   const [order, setOrder] = useState<Topic[]>([])
   const [editing, setEditing] = useState<Topic | null>(null)
   const [draft, setDraft] = useState('')
+  const [draftOrigin, setDraftOrigin] = useState('')
 
   // 意図的なパターン: localStorage（訪問したことがあるか）というReact外部の状態を
   // マウント後に読み取って表示を決める。SSRとずれないよう effect 内で行う。
@@ -219,27 +241,23 @@ export default function TopGate({ onChooseSearch, onChooseChat }: Props) {
   }, [])
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // 扉1：ひと言だけ受けてから、今ある検索の画面へ渡す。
-  // 親が再描画されても待ち時間がやり直しにならないよう、渡し先はrefで持つ。
-  const searchHandoff = useRef(onChooseSearch)
-  useEffect(() => { searchHandoff.current = onChooseSearch }, [onChooseSearch])
-  useEffect(() => {
-    if (mode !== 'toSearch') return
-    const timer = setTimeout(() => searchHandoff.current(), 1200)
-    return () => clearTimeout(timer)
-  }, [mode])
-
   const openInput = (topic: Topic) => {
     setDraft(answers[topic] ?? '')
+    setDraftOrigin(answers.origin ?? '')
     setEditing(topic)
   }
 
-  const submitInput = (topic: Topic) => {
-    const value = normalize(topic, draft)
+  const saveAnswer = (topic: Topic, raw: string, origin?: string) => {
+    const value = normalize(topic, raw)
     if (!value) return
-    setAnswers(prev => ({ ...prev, [topic]: value }))
+    setAnswers(prev => ({
+      ...prev,
+      [topic]: value,
+      ...(topic === 'dest' ? { origin: origin?.trim() || undefined } : {}),
+    }))
     setOrder(prev => (prev.includes(topic) ? prev : [...prev, topic]))
     setDraft('')
+    setDraftOrigin('')
     setEditing(null)
   }
 
@@ -251,6 +269,7 @@ export default function TopGate({ onChooseSearch, onChooseChat }: Props) {
     if (editing !== null) {
       setEditing(null)
       setDraft('')
+      setDraftOrigin('')
       return
     }
     const last = order[order.length - 1]
@@ -262,9 +281,11 @@ export default function TopGate({ onChooseSearch, onChooseChat }: Props) {
     setAnswers(prev => {
       const next = { ...prev }
       delete next[last]
+      if (last === 'dest') delete next.origin
       return next
     })
     setDraft(answers[last] ?? '')
+    setDraftOrigin(answers.origin ?? '')
     setEditing(last)
   }
 
@@ -297,41 +318,115 @@ export default function TopGate({ onChooseSearch, onChooseChat }: Props) {
         )}
 
         {mode === 'toSearch' && (
-          <RadiSays lines={['承知しました。行き先と、日程を教えてください。']} />
+          <>
+            <RadiSays lines={['承知しました。行き先と、日程を教えてください。']} />
+            <SearchForm onSubmitSentence={onSearchSentence} onSwitchToText={onChooseSearch} />
+            <div className="mt-6">
+              <BackButton onClick={() => setMode('ask')} />
+            </div>
+          </>
         )}
 
         {mode === 'collect' && editing !== null && (
           <>
             <RadiSays lines={[collectLine]} />
-            <form
-              className="mt-6 sm:mt-8"
-              onSubmit={e => { e.preventDefault(); submitInput(editing) }}
-            >
-              <label
-                htmlFor="radi-input"
-                className="block text-sm font-semibold text-gray-500 mb-2"
+
+            {/* 行き先を聞くときは、出発地も同じ画面で聞く（出発地は空のままでもよい） */}
+            {editing === 'dest' && (
+              <form
+                className="mt-6 sm:mt-8 space-y-4"
+                onSubmit={e => { e.preventDefault(); saveAnswer('dest', draft, draftOrigin) }}
               >
-                {TOPICS.find(t => t.key === editing)!.label}
-              </label>
-              <div className="flex gap-2">
-                <input
-                  id="radi-input"
-                  autoFocus
-                  value={draft}
-                  onChange={e => setDraft(e.target.value)}
-                  placeholder={TOPICS.find(t => t.key === editing)!.placeholder}
-                  inputMode={editing === 'budget' ? 'numeric' : 'text'}
-                  className="flex-1 min-w-0 rounded-2xl border border-gray-200 bg-white px-4 py-4 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                />
-                <button
-                  type="submit"
-                  disabled={!draft.trim()}
-                  className="shrink-0 rounded-2xl bg-indigo-600 px-5 py-4 text-base font-bold text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-200 disabled:text-gray-400"
-                >
-                  決定
-                </button>
+                <div>
+                  <label htmlFor="radi-origin" className="block text-sm font-semibold text-gray-500 mb-2">
+                    出発地（分かれば。空のままでも進めます）
+                  </label>
+                  <input
+                    id="radi-origin"
+                    value={draftOrigin}
+                    onChange={e => setDraftOrigin(e.target.value)}
+                    placeholder="静岡 / 東京 / 大阪"
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-4 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="radi-input" className="block text-sm font-semibold text-gray-500 mb-2">
+                    行き先（国名か都市名）
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="radi-input"
+                      autoFocus
+                      value={draft}
+                      onChange={e => setDraft(e.target.value)}
+                      placeholder="台北 / タイ / パリ"
+                      className="flex-1 min-w-0 rounded-2xl border border-gray-200 bg-white px-4 py-4 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!draft.trim()}
+                      className="shrink-0 rounded-2xl bg-indigo-600 px-5 py-4 text-base font-bold text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-200 disabled:text-gray-400"
+                    >
+                      決定
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
+
+            {/* 時期は月のボタンから選ぶ（今月から12ヶ月分） */}
+            {editing === 'when' && (
+              <div className="mt-6 sm:mt-8">
+                <p className="text-sm font-semibold text-gray-500 mb-3">行けそうな月</p>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3">
+                  {nextMonths().map(m => (
+                    <button
+                      key={m.value}
+                      type="button"
+                      onClick={() => saveAnswer('when', m.value)}
+                      className={`rounded-2xl border px-2 py-4 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
+                        answers.when === m.value
+                          ? 'border-indigo-500 bg-indigo-50'
+                          : 'border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-50/40'
+                      }`}
+                    >
+                      <span className="block text-base font-bold text-gray-900">{m.label}</span>
+                      <span className="block text-xs text-gray-400 mt-0.5">{m.sub}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </form>
+            )}
+
+            {editing === 'budget' && (
+              <form
+                className="mt-6 sm:mt-8"
+                onSubmit={e => { e.preventDefault(); saveAnswer('budget', draft) }}
+              >
+                <label htmlFor="radi-input" className="block text-sm font-semibold text-gray-500 mb-2">
+                  予算（金額）
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="radi-input"
+                    autoFocus
+                    value={draft}
+                    onChange={e => setDraft(e.target.value)}
+                    placeholder="10万円 / 50000"
+                    inputMode="numeric"
+                    className="flex-1 min-w-0 rounded-2xl border border-gray-200 bg-white px-4 py-4 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!draft.trim()}
+                    className="shrink-0 rounded-2xl bg-indigo-600 px-5 py-4 text-base font-bold text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-200 disabled:text-gray-400"
+                  >
+                    決定
+                  </button>
+                </div>
+              </form>
+            )}
+
             <div className="mt-6">
               <BackButton onClick={back} />
             </div>

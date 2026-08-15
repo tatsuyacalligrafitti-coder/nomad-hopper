@@ -225,6 +225,15 @@ export default function HomePage() {
     else aiChatRef.current?.open()
   }
 
+  // 扉1のフォームから来た文。検索画面が描かれてから渡す必要があるので、いったん置く
+  const [pendingSearchSentence, setPendingSearchSentence] = useState<string | null>(null)
+
+  const enterWithSentence = (sentence: string) => {
+    window.history.pushState({ tobiraEntered: true }, '')
+    setEntered(true)
+    setPendingSearchSentence(sentence)
+  }
+
   const backToGate = () => {
     window.history.back()
   }
@@ -645,11 +654,24 @@ export default function HomePage() {
     }
   }
 
+  // 扉1のフォームから受け取った文を、検索画面が出てから検索バーに渡して走らせる。
+  // 意図的なパターン: SearchBar は entered になって初めて描かれるため、
+  // ref が付くのを待ってから渡す必要がある。
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!entered || !pendingSearchSentence) return
+    setPendingSearchSentence(null)
+    handleChatSearch(pendingSearchSentence)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entered, pendingSearchSentence])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   return (
     <div className="min-h-screen flex flex-col">
       {!entered && (
         <TopGate
           onChooseSearch={() => enter('search')}
+          onSearchSentence={enterWithSentence}
           onChooseChat={(message) => enter('chat', message)}
         />
       )}
