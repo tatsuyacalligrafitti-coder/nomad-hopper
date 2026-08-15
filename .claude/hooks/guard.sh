@@ -51,11 +51,27 @@ done
 #   [e] は「eという1文字」＝ e と同じ
 # が、この行そのものはパターンに一致しなくなる。
 # 例: "--forc[e]" は --force に一致するが、"--forc[e]" という文字列には一致しない。
+#
+# 2026-08-16 に見つかった4つ目の穴について
+#   作業フォルダを2つに増やす作業の実測中に見つかった。
+#   git は「git」と「push」の間にオプションを挟める。
+#     git -C <フォルダ> push origin main
+#     git -c core.pager=cat push origin main
+#     git --no-pager push origin main
+#   どれも「git push」という並びを含まないため、素通りしていた（実測で確認）。
+#   worktree でフォルダが増えると -C を使う書き方が普通になるため、
+#   当たる見込みが上がる。そこで「git と push の間にオプションが挟まる形」を
+#   足した。既存の規則は1つも消していない。締める方向だけ。
+#   -C はフォルダ名を、-c は設定を、それぞれ後ろに1語ともなう。
+#   オプションだけを読み飛ばす書き方では -C の後ろのフォルダ名で外れる
+#   （最初にそう書いて、実測で外れることを確かめた）。
+#   そこで「-で始まる語」＋「その後ろに続く1語（あれば）」の繰り返しとする。
+GIT_OPT="( +-[^ ]+( +[^- ][^ ]*)?)*"
 BLOCK_PATTERNS=(
-  "git push.*origin (main|develop)( |$)"
-  "git push.*origin .*:(main|develop)( |$)"
-  "git push --forc[e]"
-  "git push -[f]"
+  "git${GIT_OPT} push.*origin (main|develop)( |$)"
+  "git${GIT_OPT} push.*origin .*:(main|develop)( |$)"
+  "git${GIT_OPT} push --forc[e]"
+  "git${GIT_OPT} push -[f]"
   "rm -r[f] /"
   "rm -r[f] ~"
   "sud[o] "
