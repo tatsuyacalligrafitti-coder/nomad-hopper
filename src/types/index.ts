@@ -135,6 +135,54 @@ export interface MultiCitySearchResult {
   totalPrice: number
 }
 
+// ── 遊び: 逆探知1段 ────────────────────────────────────────────────────────────
+// Prices in this section are cached-fare estimates (Travelpayouts), never live
+// bookable fares. The UI must say so wherever it shows one.
+
+export interface Hub {
+  iata: string
+  city: string
+  country: string
+}
+
+export interface LegQuote {
+  origin: string
+  destination: string
+  price: number        // JPY, one-way, one passenger
+  departDate: string   // YYYY-MM-DD the estimate was priced for
+  airline: string | null
+  transfers: number
+  link: string
+}
+
+export interface DetourPlan {
+  hub: Hub
+  first: LegQuote
+  second: LegQuote
+  total: number
+  saving: number
+  datesInconsistent: boolean  // the two legs' cheapest dates don't form a travellable order
+  detourRatio: number | null  // 1.24 = 24% further than the direct great circle
+}
+
+export type DetourOutcome =
+  | { status: 'ok'; month: string; direct: LegQuote; plan: DetourPlan; candidatesPriced: number }
+  | { status: 'no-cheaper'; month: string; direct: LegQuote; candidatesPriced: number }
+  | { status: 'no-direct'; month: string }
+  | { status: 'unavailable'; month: string }
+
+export interface DetourPlace {
+  iata: string
+  city: string
+  country: string
+}
+
+export interface DetourResponse {
+  origin: DetourPlace
+  destination: DetourPlace
+  outcome: DetourOutcome
+}
+
 export interface ModeConfig {
   id: SearchMode
   label: string
