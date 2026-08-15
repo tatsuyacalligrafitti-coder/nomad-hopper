@@ -521,3 +521,4 @@ Claude Code（このセッション）と、web版の本社チャット・各課
 - [2026-08-15] ブラウザ承認で常に許可を1回押すと、そのoriginは全プロジェクト共通で恒久的に通る。取り消しはファイル編集だけでは効かずClaudeアプリの再起動が要る
 - [2026-08-15] 本番2サイト tobira-world.jp と u1.lieto-ai.jp は承認なしで開ける。それ以外は従来どおりダイアログが出ることを実測で確認済み
 - [2026-08-15] ブラウザ承認はclaude_desktop_config.jsonのlaunchPreviewAllowedOriginsに保存。origin単位・全プロジェクト共通・起動中の編集は効かない
+- [2026-08-15] 本番2ドメイン（tobira-world.jp / u1.lieto-ai.jp）を登録済み。それ以外は承認が出ることを実測で確認
