@@ -15,7 +15,7 @@
 import { aviasalesLink } from '@/lib/travelpayouts'
 import { HUBS } from '@/lib/detour-hubs'
 import { distanceKm } from '@/lib/geo-coords'
-import type { Hub, LegQuote, DetourPlan, DetourOutcome } from '@/types'
+import type { Hub, LegQuote, DetourPlan, DetourOutcome, DirectOutcome } from '@/types'
 
 const TOKEN = process.env.TRAVELPAYOUTS_TOKEN
 const API = 'https://api.travelpayouts.com/v1/prices/cheap'
@@ -160,9 +160,63 @@ function detourRatioOf(origin: string, hub: string, destination: string): number
   return (a + b) / direct
 }
 
-// ── Entry point ───────────────────────────────────────────────────────────────
+// ── Entry points ──────────────────────────────────────────────────────────────
+
+type DirectLookup =
+  | { status: 'ok'; direct: LegQuote; fromTable: FareTable }
+  | { status: 'no-direct' }
+  | { status: 'unavailable' }
 
 /**
+ * The plain answer, plus the bulk fare table it came from. The table also holds
+ * most of the detour's first legs, so a later detour search can reuse it — and
+ * because the underlying fetches are cached for an hour, asking twice is cheap.
+ */
+async function lookupDirect(from: string, to: string, month: string): Promise<DirectLookup> {
+  if (!TOKEN) {
+    console.warn('[detour] TRAVELPAYOUTS_TOKEN未設定')
+    return { status: 'unavailable' }
+  }
+  if (from === to) return { status: 'no-direct' }
+
+  // One call gives every cached fare out of `from`: the direct fare and most of
+  // the first legs at once.
+  const fromLookup = await fetchCheap(from, null, month)
+  if (!fromLookup.reachable) return { status: 'unavailable' }
+  const fromTable = fromLookup.table
+
+  let directEntries = fromTable.get(to)
+  if (!directEntries) {
+    const retry = await fetchCheap(from, to, month)
+    if (!retry.reachable) return { status: 'unavailable' }
+    directEntries = retry.table.get(to)
+  }
+  const directPick = directEntries ? pickEntry(directEntries) : null
+  if (!directPick) return { status: 'no-direct' }
+
+  return { status: 'ok', direct: toQuote(from, to, directPick.entry), fromTable }
+}
+
+/**
+ * 拍2 — what it costs to just go there. No stopover is looked for; the user has
+ * not asked for one yet.
+ *
+ * @param month departure month as `YYYY-MM` — cached-fare data has no finer grain.
+ */
+export async function findDirectFare(
+  origin: string,
+  destination: string,
+  month: string,
+): Promise<DirectOutcome> {
+  const found = await lookupDirect(origin.toUpperCase(), destination.toUpperCase(), month)
+  return found.status === 'ok'
+    ? { status: 'ok', month, direct: found.direct }
+    : { status: found.status, month }
+}
+
+/**
+ * 拍4 — the stopover search, run only once the user has said yes.
+ *
  * @param month departure month as `YYYY-MM` — cached-fare data has no finer grain.
  */
 export async function findDetour(
@@ -173,27 +227,9 @@ export async function findDetour(
   const from = origin.toUpperCase()
   const to = destination.toUpperCase()
 
-  if (!TOKEN) {
-    console.warn('[detour] TRAVELPAYOUTS_TOKEN未設定')
-    return { status: 'unavailable', month }
-  }
-  if (from === to) return { status: 'no-direct', month }
-
-  // One call gives every cached fare out of `from`: the direct fare and most of
-  // the first legs at once. Anything missing is filled in individually below.
-  const fromLookup = await fetchCheap(from, null, month)
-  if (!fromLookup.reachable) return { status: 'unavailable', month }
-  const fromTable = fromLookup.table
-
-  let directEntries = fromTable.get(to)
-  if (!directEntries) {
-    const retry = await fetchCheap(from, to, month)
-    if (!retry.reachable) return { status: 'unavailable', month }
-    directEntries = retry.table.get(to)
-  }
-  const directPick = directEntries ? pickEntry(directEntries) : null
-  if (!directPick) return { status: 'no-direct', month }
-  const direct = toQuote(from, to, directPick.entry)
+  const found = await lookupDirect(from, to, month)
+  if (found.status !== 'ok') return { status: found.status, month }
+  const { direct, fromTable } = found
 
   const hubs = candidateHubs(from, to)
 

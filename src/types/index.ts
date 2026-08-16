@@ -171,10 +171,24 @@ export type DetourOutcome =
   | { status: 'no-direct'; month: string }
   | { status: 'unavailable'; month: string }
 
+// The first beat: the plain answer, before any stopover has been proposed. Kept
+// separate from DetourOutcome because the page must be able to show the direct
+// fare without having searched for a detour — the user has not asked yet.
+export type DirectOutcome =
+  | { status: 'ok'; month: string; direct: LegQuote }
+  | { status: 'no-direct'; month: string }
+  | { status: 'unavailable'; month: string }
+
 export interface DetourPlace {
   iata: string
   city: string
   country: string
+}
+
+export interface DirectResponse {
+  origin: DetourPlace
+  destination: DetourPlace
+  outcome: DirectOutcome
 }
 
 export interface DetourResponse {
