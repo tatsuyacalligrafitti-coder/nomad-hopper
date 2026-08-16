@@ -84,6 +84,15 @@ async function fetchCheap(origin: string, destination: string | null, month: str
     )
     if (entries.length > 0) table.set(dest.toUpperCase(), entries)
   }
+
+  // 調査用（2026-08-16）: Travelpayouts が応答をどのコードで返すかを確かめる。
+  // 空港コードで要求したものが都市コードで返っていないかを見るためのもので、
+  // 確認がとれ次第この行は外す。
+  console.log(
+    `[detour:調査] 要求 origin=${origin} destination=${destination ?? '(なし)'} ` +
+      `/ 応答キー=[${[...table.keys()].join(',')}]`,
+  )
+
   return { reachable: true, table }
 }
 
