@@ -96,17 +96,33 @@ function todayPlus(days: number): string {
   return addDays(new Date().toISOString().split('T')[0], days)
 }
 
+// Trailing particles and verb endings: 「へ」「から」「に行きたい」. Kept to a
+// closing run of kana plus the handful of kanji that show up in travel verbs, so
+// it can never eat part of a place name written in kanji or katakana.
+const DECORATION_TAIL = /[぀-ゟ行着発帰向]+$/
+
+/** "バンコクへ" → "バンコク". Returns the input unchanged if stripping empties it. */
+function stripDecoration(s: string): string {
+  const bare = s.replace(DECORATION_TAIL, '')
+  return bare.length > 0 ? bare : s
+}
+
 /** Resolve a free-text city fragment to an IATA code. */
 function resolveCity(fragment: string): string | null {
   const trimmed = fragment.trim()
   if (!trimmed) return null
 
+  const bare = stripDecoration(trimmed)
+
   // 1. Full airport DB (English city/airport names, bare IATA codes)
   const fromDB = resolveFromDB(trimmed)
   if (fromDB) return fromDB
 
-  // 1.5. Country name shorthand (e.g. "ケニア" → NBO, "フィリピン" → MNL)
-  const fromCountry = JP_COUNTRY_IATA[trimmed]
+  // 1.5. Country name shorthand (e.g. "ケニア" → NBO, "フィリピン" → MNL).
+  // Also tried without decoration: 24 of these names live only in this table, so
+  // "マレーシアへ" used to miss here and get picked up further down by マレ → MLE
+  // (Maldives). Audited 2026-08-16.
+  const fromCountry = JP_COUNTRY_IATA[trimmed] ?? JP_COUNTRY_IATA[bare]
   if (fromCountry) return fromCountry
 
   // 2. Japanese name — exact match (resolves "ミラノ" → MXP, "ナイロビ" → NBO, etc.)
@@ -114,9 +130,17 @@ function resolveCity(fragment: string): string | null {
     if (trimmed === jp) return iata
   }
 
-  // 3. Japanese name — partial match (fragment contains jp name, or jp name starts with fragment)
+  // 3. Japanese name — the name plus decoration ("香港へ"), or a prefix of one
+  //    ("バンコ" while still typing).
+  //
+  // This used to be a plain substring test, which fired whenever a known name
+  // appeared anywhere inside the input — including as a syllable run inside an
+  // unrelated place. リマ sits inside キリマンジャロ, so Kilimanjaro resolved to
+  // Lima, Peru; マレ sits inside マレーシア, so Malaysia resolved to the Maldives.
+  // Matching against the decoration-stripped form keeps every particle case and
+  // removes the coincidences (audited 2026-08-16 over 1,420 inputs).
   for (const [jp, iata] of JP_TO_IATA) {
-    if (trimmed.includes(jp) || jp.startsWith(trimmed)) return iata
+    if (bare === jp || jp.startsWith(trimmed)) return iata
   }
 
   // 4. AIRPORT_MAP lightweight parser (handles common Japanese city names)
