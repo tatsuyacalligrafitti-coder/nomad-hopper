@@ -75,10 +75,13 @@ export async function POST(request: NextRequest) {
     if (flights.length > 0) {
       try {
         const currentPrice = Math.min(...flights.map((f) => f.totalPrice))
+        // returnDate decides the comparison set: round-trip totals are positioned
+        // against round-trip observations only, never against one-way fares.
         categorized.validityNote = await assessPriceValidity(
           query.origin,
           query.destination,
           currentPrice,
+          query.returnDate,
         )
       } catch (err) {
         console.warn(
