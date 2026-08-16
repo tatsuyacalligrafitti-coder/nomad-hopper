@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { findDirectFare } from '@/lib/detour-search'
+import { findDirectFare } from '@/lib/direct-fare'
 import { describe, parseGameRequest } from '../_shared'
 import type { DirectResponse } from '@/types'
 

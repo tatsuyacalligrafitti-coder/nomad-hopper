@@ -171,11 +171,40 @@ export type DetourOutcome =
   | { status: 'no-direct'; month: string }
   | { status: 'unavailable'; month: string }
 
+// A real, bookable fare from the four-provider stack — the same numbers the top
+// page shows. Never mixed into an arithmetic with a LegQuote estimate.
+export interface RealFare {
+  price: number
+  currency: string
+  airline: string | null
+  departDate: string
+  stops: number
+  bookingLink?: string
+}
+
 // The first beat: the plain answer, before any stopover has been proposed. Kept
 // separate from DetourOutcome because the page must be able to show the direct
 // fare without having searched for a detour — the user has not asked yet.
+//
+// `real` and `estimate` come from different sources and at least one is present
+// when the status is 'ok'. `date` is the single day the real search priced;
+// `dateFromEstimate` says whether that day came from the cached-fare data (the
+// cheapest day it knew) or is just the middle of the month.
 export type DirectOutcome =
-  | { status: 'ok'; month: string; direct: LegQuote }
+  | {
+      status: 'ok'
+      month: string
+      date: string
+      dateFromEstimate: boolean
+      real: RealFare | null
+      estimate: LegQuote | null
+    }
+  | { status: 'no-direct'; month: string }
+  | { status: 'unavailable'; month: string }
+
+/** Travelpayouts' cached-fare answer on its own, used to build the 拍4 comparison. */
+export type DirectEstimateOutcome =
+  | { status: 'ok'; month: string; estimate: LegQuote }
   | { status: 'no-direct'; month: string }
   | { status: 'unavailable'; month: string }
 

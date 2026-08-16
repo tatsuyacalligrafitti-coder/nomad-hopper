@@ -226,26 +226,58 @@ export default function DetourGame({ defaultMonth }: { defaultMonth: string }) {
         </p>
       )}
 
-      {/* 拍2 — the plain answer. One number, no flourish. */}
+      {/* 拍2 — the plain answer, from the same stack as the top page. One number. */}
       {directOutcome?.status === 'ok' && direct && (
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           <p className="text-xs font-medium text-gray-500">
             {direct.origin.city} → {direct.destination.city}
           </p>
-          <p className="mt-1 flex items-center gap-2 text-2xl font-semibold tabular-nums text-gray-900">
-            {YEN(directOutcome.direct.price)}
-            <EstimateTag />
-          </p>
-          <p className="mt-1 text-xs text-gray-500">
-            {formatDate(directOutcome.direct.departDate)}ごろ発
-          </p>
+          {directOutcome.real ? (
+            <>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">
+                {YEN(directOutcome.real.price)}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                {formatDate(directOutcome.real.departDate)}発
+                {directOutcome.real.airline ? ` ・ ${directOutcome.real.airline}` : ''}
+                {directOutcome.real.stops === 0 ? ' ・ 直行' : ` ・ 乗り継ぎ${directOutcome.real.stops}回`}
+              </p>
+              <p className="mt-2 text-xs text-gray-500">
+                通常の検索と同じ調べ方で出した、実際の価格です。
+                {directOutcome.dateFromEstimate
+                  ? 'その月で安かった日を選んで調べています。'
+                  : '月の途中の日で調べています。'}
+              </p>
+            </>
+          ) : (
+            // The four-provider search came back empty; the cached estimate is all we have.
+            <>
+              <p className="mt-1 flex items-center gap-2 text-2xl font-semibold tabular-nums text-gray-900">
+                {YEN(directOutcome.estimate!.price)}
+                <EstimateTag />
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                {formatDate(directOutcome.estimate!.departDate)}ごろ発
+              </p>
+              <p className="mt-2 text-xs text-gray-500">
+                {formatDate(directOutcome.date)}で通常の検索を試しましたが、便が見つかりませんでした。
+                上の金額は概算です。
+              </p>
+            </>
+          )}
+          <a
+            href={mainSearchHref(direct.origin.city, direct.destination.city, directOutcome.date)}
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 underline underline-offset-2"
+          >
+            通常の検索で開く
+            <ExternalLink size={11} />
+          </a>
         </div>
       )}
 
       {/* 拍3 — the question. Nothing is searched until this is answered. */}
       {askingPermission && (
         <Radi>
-          <p>概算です。いま買える価格ではありません。</p>
           <p>ひとつ、試してみたいことがあります。調べてみましょうか？</p>
           <button
             type="button"
@@ -297,16 +329,24 @@ export default function DetourGame({ defaultMonth }: { defaultMonth: string }) {
       {/* 拍4 and 拍5 — the gap, then the honest part, in that order. */}
       {detourOutcome?.status === 'ok' && detour && plan && (
         <div className="space-y-5">
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
+          {/* Its own bordered, tinted block: everything inside is an estimate, and
+              the number above (the real fare) must not be read as part of it. */}
+          <div className="rounded-xl border-2 border-amber-300 bg-amber-50/60 p-4">
+            <p className="mb-3 flex items-center gap-2 text-xs font-semibold text-amber-900">
+              <EstimateTag />
+              ここから下は、概算どうしの比べものです
+            </p>
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
-                <p className="text-xs font-medium text-gray-500">そのまま行くと</p>
+                <p className="text-xs font-medium text-gray-500">そのまま行く（概算）</p>
                 <p className="text-xl font-semibold tabular-nums text-gray-500 line-through">
                   {YEN(detourOutcome.direct.price)}
                 </p>
               </div>
               <div>
-                <p className="text-xs font-medium text-gray-500">{plan.hub.city}を挟むと</p>
+                <p className="text-xs font-medium text-gray-500">
+                  {plan.hub.city}を挟む（概算）
+                </p>
                 <p className="text-xl font-semibold tabular-nums text-gray-900">
                   {YEN(plan.total)}
                 </p>
@@ -318,15 +358,17 @@ export default function DetourGame({ defaultMonth }: { defaultMonth: string }) {
                 </p>
               </div>
             </div>
-            <p className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-              <EstimateTag />
-              <span>3つとも概算です。同じ出どころの数字どうしを引き算しています。</span>
+            <p className="mt-3 text-xs leading-relaxed text-gray-600">
+              この3つは、上の実際の価格とは出どころが違います。
+              概算どうしを比べているので差額には意味がありますが、
+              <strong>上の実価格から引き算はできません</strong>。
             </p>
           </div>
 
           <Radi>
             <p>
-              {plan.hub.country}の{plan.hub.city}を挟むと、{YEN(plan.saving)}安くなります。
+              概算どうしで比べると、{plan.hub.country}の{plan.hub.city}を挟むほうが
+              {YEN(plan.saving)}安く出ました。
             </p>
             {plan.datesInconsistent ? (
               <p>
@@ -344,7 +386,8 @@ export default function DetourGame({ defaultMonth }: { defaultMonth: string }) {
               1本目が遅れて2本目に乗れなくても、振替や払い戻しは受けられません。
             </p>
             <p>
-              金額はどれも概算です。いま買える価格ではありません。
+              経由の金額は概算です。いま買える価格ではありません。
+              上に出した直行の価格とは調べ方が違うので、そのまま引き算はできません。
               買えるかどうかは、区間ごとに調べて確かめてください。
             </p>
           </Radi>

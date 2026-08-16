@@ -16,7 +16,7 @@ import { aviasalesLink } from '@/lib/travelpayouts'
 import { HUBS } from '@/lib/detour-hubs'
 import { distanceKm } from '@/lib/geo-coords'
 import { cityCodeOf } from '@/lib/city-codes'
-import type { Hub, LegQuote, DetourPlan, DetourOutcome, DirectOutcome } from '@/types'
+import type { Hub, LegQuote, DetourPlan, DetourOutcome, DirectEstimateOutcome } from '@/types'
 
 const TOKEN = process.env.TRAVELPAYOUTS_TOKEN
 const API = 'https://api.travelpayouts.com/v1/prices/cheap'
@@ -229,19 +229,22 @@ async function lookupDirect(from: string, to: string, month: string): Promise<Di
 }
 
 /**
- * 拍2 — what it costs to just go there. No stopover is looked for; the user has
- * not asked for one yet.
+ * The cached-fare answer for the direct route, on its own.
+ *
+ * Not what 拍2 shows — that is a real fare from the four-provider stack (see
+ * src/lib/direct-fare.ts). This is the figure the stopover comparison is built
+ * from, and the hint for which day of the month is worth pricing.
  *
  * @param month departure month as `YYYY-MM` — cached-fare data has no finer grain.
  */
-export async function findDirectFare(
+export async function findDirectEstimate(
   origin: string,
   destination: string,
   month: string,
-): Promise<DirectOutcome> {
+): Promise<DirectEstimateOutcome> {
   const found = await lookupDirect(origin.toUpperCase(), destination.toUpperCase(), month)
   return found.status === 'ok'
-    ? { status: 'ok', month, direct: found.direct }
+    ? { status: 'ok', month, estimate: found.direct }
     : { status: found.status, month }
 }
 
