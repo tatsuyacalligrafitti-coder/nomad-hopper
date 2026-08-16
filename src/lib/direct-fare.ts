@@ -61,14 +61,19 @@ export async function findDirectFare(
 
   let real: RealFare | null = null
   try {
-    const { flights } = await searchAllProviders({
-      origin: from,
-      destination: to,
-      departureDate: picked.date,
-      passengers: 1,
-      cabinClass: 'economy',
-      rawQuery: '',
-    })
+    const { flights } = await searchAllProviders(
+      {
+        origin: from,
+        destination: to,
+        departureDate: picked.date,
+        passengers: 1,
+        cabinClass: 'economy',
+        rawQuery: '',
+      },
+      // /asobi is an experiment, not a visitor searching. pricehist is built from
+      // real lookups and a synthetic one cannot be separated out later.
+      { recordHistory: false },
+    )
     if (flights.length > 0) {
       const cheapest = flights.reduce((min, f) => (f.totalPrice < min.totalPrice ? f : min), flights[0])
       real = {

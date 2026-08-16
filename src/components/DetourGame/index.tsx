@@ -329,24 +329,23 @@ export default function DetourGame({ defaultMonth }: { defaultMonth: string }) {
       {/* 拍4 and 拍5 — the gap, then the honest part, in that order. */}
       {detourOutcome?.status === 'ok' && detour && plan && (
         <div className="space-y-5">
-          {/* Its own bordered, tinted block: everything inside is an estimate, and
-              the number above (the real fare) must not be read as part of it. */}
+          {/* The tinted frame and the one heading carry "different ruler" on their
+              own, so the numbers inside need no repeated (概算) labels and the
+              footer needs one sentence, not three (憲章「一度に言うのは一つ」). */}
           <div className="rounded-xl border-2 border-amber-300 bg-amber-50/60 p-4">
             <p className="mb-3 flex items-center gap-2 text-xs font-semibold text-amber-900">
               <EstimateTag />
-              ここから下は、概算どうしの比べものです
+              概算どうしの比べもの
             </p>
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
-                <p className="text-xs font-medium text-gray-500">そのまま行く（概算）</p>
+                <p className="text-xs font-medium text-gray-500">そのまま行く</p>
                 <p className="text-xl font-semibold tabular-nums text-gray-500 line-through">
                   {YEN(detourOutcome.direct.price)}
                 </p>
               </div>
               <div>
-                <p className="text-xs font-medium text-gray-500">
-                  {plan.hub.city}を挟む（概算）
-                </p>
+                <p className="text-xs font-medium text-gray-500">{plan.hub.city}を挟む</p>
                 <p className="text-xl font-semibold tabular-nums text-gray-900">
                   {YEN(plan.total)}
                 </p>
@@ -358,10 +357,8 @@ export default function DetourGame({ defaultMonth }: { defaultMonth: string }) {
                 </p>
               </div>
             </div>
-            <p className="mt-3 text-xs leading-relaxed text-gray-600">
-              この3つは、上の実際の価格とは出どころが違います。
-              概算どうしを比べているので差額には意味がありますが、
-              <strong>上の実価格から引き算はできません</strong>。
+            <p className="mt-3 text-xs text-gray-600">
+              上の実際の価格とは出どころが違うので、引き算はできません。
             </p>
           </div>
 
@@ -385,11 +382,9 @@ export default function DetourGame({ defaultMonth }: { defaultMonth: string }) {
               航空券は別々の購入になるため、乗り継ぎの保証はありません。
               1本目が遅れて2本目に乗れなくても、振替や払い戻しは受けられません。
             </p>
-            <p>
-              経由の金額は概算です。いま買える価格ではありません。
-              上に出した直行の価格とは調べ方が違うので、そのまま引き算はできません。
-              買えるかどうかは、区間ごとに調べて確かめてください。
-            </p>
+            {/* The frame above already says these are estimates and cannot be
+                subtracted; Radi adds only what to do next. */}
+            <p>経由の金額は概算です。買えるかどうかは、区間ごとに調べて確かめてください。</p>
           </Radi>
 
           <div className="grid gap-3 sm:grid-cols-2">
