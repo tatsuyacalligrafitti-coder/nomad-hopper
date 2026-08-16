@@ -195,6 +195,13 @@ const COUNTRY_NAME_TO_ISO: Record<string, string> = {
 }
 
 // ── Preferred IATA per country (overrides first-International heuristic) ──────
+//
+// Every country that COUNTRY_NAME_TO_ISO can resolve needs an entry here. Without
+// one, the country falls through to "first International airport in whatever
+// order the JSON happens to list them", which is arbitrary and was silently wrong:
+// バングラデシュ resolved to Sylhet, イラン to Zahedan, ルーマニア to Târgu Mureș
+// (audited 2026-08-16 — those three, plus ブルネイ which the fallback got right by
+// luck, were the only four countries missing an entry).
 const COUNTRY_PREFERRED: Record<string, string> = {
   JP: 'HND', US: 'JFK', GB: 'LHR', FR: 'CDG', DE: 'FRA',
   NL: 'AMS', IT: 'FCO', ES: 'MAD', AU: 'SYD', CN: 'PEK',
@@ -211,6 +218,7 @@ const COUNTRY_PREFERRED: Record<string, string> = {
   SE: 'ARN', NO: 'OSL', DK: 'CPH', FI: 'HEL', PL: 'WAW',
   CZ: 'PRG', HU: 'BUD', GR: 'ATH', HR: 'ZAG', PT: 'LIS',
   BE: 'BRU', CH: 'ZRH', AT: 'VIE',
+  BD: 'DAC', IR: 'IKA', RO: 'OTP', BN: 'BWN',
 }
 
 // ── Country name entries sorted longest-first (prevents 'インド' matching before 'インドネシア') ──

@@ -245,6 +245,32 @@ const SORTED_ENTRIES = Object.entries(AIRPORT_MAP).sort(
   ([a], [b]) => b.length - a.length
 )
 
+const KATAKANA = /[ァ-ヺーヽヾ]/
+
+/**
+ * Position of `key` inside `text` as a whole word, or -1.
+ *
+ * These scans exist to pull a city out of a longer sentence ("5月に東京から…"),
+ * so they cannot demand an exact match. But a katakana key sitting in the middle
+ * of a longer katakana run is a syllable coincidence, not a place name: リマ
+ * inside キリマンジャロ is what sent Kilimanjaro to Lima, Peru, and マレ inside
+ * マレーシア sent Malaysia to the Maldives (audited 2026-08-16). For katakana keys
+ * we therefore require a non-katakana boundary on both sides. Kanji and latin keys
+ * are unaffected — 東京 in "5月に東京から" is surrounded by kana, not kanji.
+ */
+function indexOfWholeWord(text: string, key: string): number {
+  if (!KATAKANA.test(key[0])) return text.indexOf(key)
+  let from = 0
+  for (;;) {
+    const idx = text.indexOf(key, from)
+    if (idx === -1) return -1
+    const before = idx > 0 ? text[idx - 1] : ''
+    const after = text[idx + key.length] ?? ''
+    if (!KATAKANA.test(before) && !KATAKANA.test(after)) return idx
+    from = idx + 1
+  }
+}
+
 // Separators tried in order.
 // " to " (with spaces) avoids matching "to" inside "tokyo".
 const ROUTE_SEPARATORS = ['から', '→', '->', '⇒', '〜', '~', '発', ' to ']
@@ -265,7 +291,7 @@ export function resolveAirport(fragment: string): string | null {
 
   // 3. Substring search: fragment may contain city + date/passengers text
   for (const [key, code] of SORTED_ENTRIES) {
-    if (lower.includes(key.toLowerCase())) return code
+    if (indexOfWholeWord(lower, key.toLowerCase()) !== -1) return code
   }
 
   return null
@@ -381,7 +407,7 @@ export function parseSearchQuery(rawQuery: string): ParsedQuery {
     // Collect (position, code) pairs; deduplicate by code (e.g. 沖縄 & 那覇 both = OKA)
     const hits: Array<{ index: number; code: string }> = []
     for (const [key, code] of SORTED_ENTRIES) {
-      const idx = lower.indexOf(key.toLowerCase())
+      const idx = indexOfWholeWord(lower, key.toLowerCase())
       if (idx === -1) continue
       if (hits.some((h) => h.code === code)) continue
       hits.push({ index: idx, code })
