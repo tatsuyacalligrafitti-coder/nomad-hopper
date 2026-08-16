@@ -5,12 +5,13 @@
 // Japanese labels — otherwise the second answer could quietly be about a
 // different route than the first.
 
-import { getAirportByIata, resolveFromDB } from '@/lib/airport-db'
+import { getAirportByIata } from '@/lib/airport-db'
 import { hubByIata } from '@/lib/detour-hubs'
-import { japaneseNameOf, resolveJapanesePlace } from '@/lib/place-names-ja'
+import { resolveCity } from '@/lib/resolve-place'
+import { cityNameJaOf } from '@/lib/city-codes'
+import { IATA_JP_NAMES } from '@/lib/iata-names'
 import type { DetourPlace } from '@/types'
 
-const IATA = /^[A-Za-z]{3}$/
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
 
 interface RequestBody {
@@ -19,26 +20,21 @@ interface RequestBody {
   month?: string
 }
 
-/** Free text ("バンコク", "bangkok") or an IATA code → IATA code. */
-function toIata(input: string): string | null {
-  const trimmed = input.trim()
-  if (!trimmed) return null
-  if (IATA.test(trimmed)) {
-    const upper = trimmed.toUpperCase()
-    if (getAirportByIata(upper)) return upper
-  }
-  return resolveJapanesePlace(trimmed) ?? resolveFromDB(trimmed)
-}
-
-/** Japanese city/country labels, preferring curated names over the raw (English) DB. */
+/**
+ * Japanese labels for a resolved airport.
+ *
+ * The city name is the area the /asobi price actually covers, not the airport we
+ * resolved to: fares here are fetched per city code, so a HND result is really
+ * "cheapest out of Tokyo" and must not be labelled 東京 羽田.
+ */
 export function describe(iata: string): DetourPlace {
+  const cityWide = cityNameJaOf(iata)
   const hub = hubByIata(iata)
-  if (hub) return hub
   const ap = getAirportByIata(iata)
   return {
     iata,
-    city: japaneseNameOf(iata) ?? ap?.city ?? iata,
-    country: ap?.country ?? '',
+    city: cityWide ?? hub?.city ?? IATA_JP_NAMES[iata] ?? ap?.city ?? iata,
+    country: hub?.country ?? ap?.country ?? '',
   }
 }
 
@@ -63,10 +59,11 @@ export async function parseGameRequest(request: Request): Promise<ParsedRequest>
     return { ok: false, error: '時期は YYYY-MM の形で指定してください' }
   }
 
-  const from = toIata(origin)
+  // Same resolver as the top-page search, so the same words give the same airport.
+  const from = resolveCity(origin)
   if (!from) return { ok: false, error: `出発地「${origin}」の空港が見つかりませんでした` }
 
-  const to = toIata(destination)
+  const to = resolveCity(destination)
   if (!to) return { ok: false, error: `行き先「${destination}」の空港が見つかりませんでした` }
 
   if (from === to) return { ok: false, error: '出発地と行き先が同じです' }

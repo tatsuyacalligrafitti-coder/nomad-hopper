@@ -15,6 +15,7 @@
 import { aviasalesLink } from '@/lib/travelpayouts'
 import { HUBS } from '@/lib/detour-hubs'
 import { distanceKm } from '@/lib/geo-coords'
+import { cityCodeOf } from '@/lib/city-codes'
 import type { Hub, LegQuote, DetourPlan, DetourOutcome, DirectOutcome } from '@/types'
 
 const TOKEN = process.env.TRAVELPAYOUTS_TOKEN
@@ -37,7 +38,7 @@ interface CheapEntry {
   duration?: number
 }
 
-/** All cached fares from `origin`, keyed by destination IATA. */
+/** All cached fares from `origin`, keyed by whatever code Travelpayouts answered with. */
 type FareTable = Map<string, CheapEntry[]>
 
 /**
@@ -52,16 +53,20 @@ interface FareLookup {
 
 const UNREACHABLE: FareLookup = { reachable: false, table: new Map() }
 
+/**
+ * @param origin      airport IATA; converted to a city code on the wire
+ * @param destination airport IATA, or null for "everywhere from origin"
+ */
 async function fetchCheap(origin: string, destination: string | null, month: string): Promise<FareLookup> {
   if (!TOKEN) return UNREACHABLE
 
   const params = new URLSearchParams({
-    origin,
+    origin: cityCodeOf(origin),
     currency: 'jpy',
     token: TOKEN,
     depart_date: month,
   })
-  if (destination) params.set('destination', destination)
+  if (destination) params.set('destination', cityCodeOf(destination))
 
   let json: { success?: boolean; data?: Record<string, Record<string, CheapEntry>> }
   try {
@@ -84,16 +89,26 @@ async function fetchCheap(origin: string, destination: string | null, month: str
     )
     if (entries.length > 0) table.set(dest.toUpperCase(), entries)
   }
-
-  // 調査用（2026-08-16）: Travelpayouts が応答をどのコードで返すかを確かめる。
-  // 空港コードで要求したものが都市コードで返っていないかを見るためのもので、
-  // 確認がとれ次第この行は外す。
-  console.log(
-    `[detour:調査] 要求 origin=${origin} destination=${destination ?? '(なし)'} ` +
-      `/ 応答キー=[${[...table.keys()].join(',')}]`,
-  )
-
   return { reachable: true, table }
+}
+
+/**
+ * Pull one airport's fares out of a response table.
+ *
+ * Never assumes the answer is filed under the code we asked about: Travelpayouts
+ * replies in city codes, so a request about MXP comes back under MIL. We look up
+ * the city code, and when the request named a single destination we accept a
+ * lone entry whatever it is called — the reply can only be about that route.
+ */
+function entriesFor(table: FareTable, airport: string, singleDestination: boolean): CheapEntry[] | undefined {
+  const exact = table.get(airport.toUpperCase())
+  if (exact) return exact
+
+  const byCity = table.get(cityCodeOf(airport))
+  if (byCity) return byCity
+
+  if (singleDestination && table.size === 1) return [...table.values()][0]
+  return undefined
 }
 
 /** Run `jobs` with a bounded number in flight; failures resolve to null. */
@@ -148,7 +163,13 @@ function pickEntry(entries: CheapEntry[], notBefore?: string): { entry: CheapEnt
 function candidateHubs(origin: string, destination: string): Hub[] {
   const direct = distanceKm(origin, destination)
 
-  const scored = HUBS.filter((h) => h.iata !== origin && h.iata !== destination).map((h) => {
+  // Compare by city code: routing Seoul-Gimpo through Seoul-Incheon is not a detour.
+  const fromCity = cityCodeOf(origin)
+  const toCity = cityCodeOf(destination)
+
+  const scored = HUBS.filter(
+    (h) => cityCodeOf(h.iata) !== fromCity && cityCodeOf(h.iata) !== toCity,
+  ).map((h) => {
     const viaA = distanceKm(origin, h.iata)
     const viaB = distanceKm(h.iata, destination)
     // Unknown coordinates → no opinion on the geometry; let price decide.
@@ -186,7 +207,8 @@ async function lookupDirect(from: string, to: string, month: string): Promise<Di
     console.warn('[detour] TRAVELPAYOUTS_TOKEN未設定')
     return { status: 'unavailable' }
   }
-  if (from === to) return { status: 'no-direct' }
+  // Same city → same Travelpayouts code, so there is no route to price.
+  if (cityCodeOf(from) === cityCodeOf(to)) return { status: 'no-direct' }
 
   // One call gives every cached fare out of `from`: the direct fare and most of
   // the first legs at once.
@@ -194,11 +216,11 @@ async function lookupDirect(from: string, to: string, month: string): Promise<Di
   if (!fromLookup.reachable) return { status: 'unavailable' }
   const fromTable = fromLookup.table
 
-  let directEntries = fromTable.get(to)
+  let directEntries = entriesFor(fromTable, to, false)
   if (!directEntries) {
     const retry = await fetchCheap(from, to, month)
     if (!retry.reachable) return { status: 'unavailable' }
-    directEntries = retry.table.get(to)
+    directEntries = entriesFor(retry.table, to, true)
   }
   const directPick = directEntries ? pickEntry(directEntries) : null
   if (!directPick) return { status: 'no-direct' }
@@ -244,16 +266,16 @@ export async function findDetour(
 
   // First legs: reuse the bulk table, look up only what it lacks.
   const firstLegJobs = hubs.map((h) => async () => {
-    const cached = fromTable.get(h.iata)
+    const cached = entriesFor(fromTable, h.iata, false)
     if (cached) return cached
-    return (await fetchCheap(from, h.iata, month)).table.get(h.iata) ?? null
+    return entriesFor((await fetchCheap(from, h.iata, month)).table, h.iata, true) ?? null
   })
   const firstLegs = await pooled(firstLegJobs, CONCURRENCY)
 
   // Second legs always need their own call — they start somewhere else.
   const secondLegJobs = hubs.map((h, i) => async () => {
     if (!firstLegs[i]) return null // no first leg → the pair can't exist
-    return (await fetchCheap(h.iata, to, month)).table.get(to) ?? null
+    return entriesFor((await fetchCheap(h.iata, to, month)).table, to, true) ?? null
   })
   const secondLegs = await pooled(secondLegJobs, CONCURRENCY)
 

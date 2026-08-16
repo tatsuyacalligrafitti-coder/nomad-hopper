@@ -8,11 +8,17 @@
 //   拍5 正直に言う        — the stay length and the separate-ticket risk, in Radi's
 //                          own voice. 原則7 forbids demoting these to fine print.
 //
-// The one rule that shapes the whole file: pressing 調べる must not look for a
-// stopover. Beat 4 lives behind its own request and its own button.
+// Two rules shape the whole file:
+//
+//   1. Pressing 調べる must not look for a stopover. Beat 4 lives behind its own
+//      request and its own button.
+//   2. Every number on this page is a cached-fare estimate, and every one of them
+//      says so. The gap is an estimate minus an estimate — same ruler on both
+//      sides. Real, bookable prices come from the main search, and /asobi hands
+//      the reader over to it rather than quoting one itself.
 
 import { useState } from 'react'
-import { ArrowRight, Loader2, Search } from 'lucide-react'
+import { ArrowRight, ExternalLink, Loader2, Search } from 'lucide-react'
 import DetourMap from '@/components/DetourMap'
 import type { DetourResponse, DirectResponse, LegQuote } from '@/types'
 
@@ -28,6 +34,22 @@ function nightsBetween(a: string, b: string): number {
   return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000)
 }
 
+/**
+ * A link into the main search, pre-filled. The top page auto-runs whatever `q`
+ * holds, so this is the hand-off from estimates to real, bookable prices.
+ */
+function mainSearchHref(fromCity: string, toCity: string, date: string): string {
+  return `/?q=${encodeURIComponent(`${fromCity}から${toCity}へ ${date}`)}`
+}
+
+function EstimateTag() {
+  return (
+    <span className="shrink-0 whitespace-nowrap rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">
+      概算
+    </span>
+  )
+}
+
 /** Radi speaks in a bubble with a name on it, so her voice is never mistaken for chrome. */
 function Radi({ children }: { children: React.ReactNode }) {
   return (
@@ -38,7 +60,17 @@ function Radi({ children }: { children: React.ReactNode }) {
   )
 }
 
-function LegCard({ leg, label }: { leg: LegQuote; label: string }) {
+function LegCard({
+  leg,
+  label,
+  fromCity,
+  toCity,
+}: {
+  leg: LegQuote
+  label: string
+  fromCity: string
+  toCity: string
+}) {
   return (
     <div className="rounded-lg border border-gray-200 p-3">
       <div className="mb-1 flex items-baseline justify-between gap-2">
@@ -49,15 +81,17 @@ function LegCard({ leg, label }: { leg: LegQuote; label: string }) {
         <span>{leg.origin}</span>
         <ArrowRight size={14} className="text-gray-400" />
         <span>{leg.destination}</span>
-        <span className="ml-auto tabular-nums">{YEN(leg.price)}</span>
+        <span className="ml-auto flex items-center gap-1.5 tabular-nums">
+          {YEN(leg.price)}
+          <EstimateTag />
+        </span>
       </div>
       <a
-        href={leg.link}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-2 inline-block text-xs text-blue-600 underline underline-offset-2"
+        href={mainSearchHref(fromCity, toCity, leg.departDate)}
+        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 underline underline-offset-2"
       >
-        この区間を検索する
+        この区間の実際の価格を調べる
+        <ExternalLink size={11} />
       </a>
     </div>
   )
@@ -198,8 +232,9 @@ export default function DetourGame({ defaultMonth }: { defaultMonth: string }) {
           <p className="text-xs font-medium text-gray-500">
             {direct.origin.city} → {direct.destination.city}
           </p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">
+          <p className="mt-1 flex items-center gap-2 text-2xl font-semibold tabular-nums text-gray-900">
             {YEN(directOutcome.direct.price)}
+            <EstimateTag />
           </p>
           <p className="mt-1 text-xs text-gray-500">
             {formatDate(directOutcome.direct.departDate)}ごろ発
@@ -229,12 +264,26 @@ export default function DetourGame({ defaultMonth }: { defaultMonth: string }) {
         </p>
       )}
 
-      {detourOutcome?.status === 'no-cheaper' && (
+      {detourOutcome?.status === 'no-cheaper' && detour && (
         <Radi>
           <p>調べましたが、今回はそのまま行くのが最善です。</p>
           <p className="text-gray-600">
             経由地を{detourOutcome.candidatesPriced}通り試しました。どれも直行より高くつきます。
           </p>
+          <p>
+            ここまでの金額は概算です。実際に買える価格は、こちらで確かめてください。
+          </p>
+          <a
+            href={mainSearchHref(
+              detour.origin.city,
+              detour.destination.city,
+              detourOutcome.direct.departDate,
+            )}
+            className="inline-flex items-center gap-1 text-sm font-medium text-blue-700 underline underline-offset-2"
+          >
+            {detour.origin.city} → {detour.destination.city} の実際の価格を調べる
+            <ExternalLink size={12} />
+          </a>
         </Radi>
       )}
 
@@ -269,6 +318,10 @@ export default function DetourGame({ defaultMonth }: { defaultMonth: string }) {
                 </p>
               </div>
             </div>
+            <p className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+              <EstimateTag />
+              <span>3つとも概算です。同じ出どころの数字どうしを引き算しています。</span>
+            </p>
           </div>
 
           <Radi>
@@ -290,12 +343,25 @@ export default function DetourGame({ defaultMonth }: { defaultMonth: string }) {
               航空券は別々の購入になるため、乗り継ぎの保証はありません。
               1本目が遅れて2本目に乗れなくても、振替や払い戻しは受けられません。
             </p>
-            <p>金額はどちらも概算です。いま買える価格ではありません。</p>
+            <p>
+              金額はどれも概算です。いま買える価格ではありません。
+              買えるかどうかは、区間ごとに調べて確かめてください。
+            </p>
           </Radi>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <LegCard leg={plan.first} label={`1本目 ${detour.origin.city} → ${plan.hub.city}`} />
-            <LegCard leg={plan.second} label={`2本目 ${plan.hub.city} → ${detour.destination.city}`} />
+            <LegCard
+              leg={plan.first}
+              label={`1本目 ${detour.origin.city} → ${plan.hub.city}`}
+              fromCity={detour.origin.city}
+              toCity={plan.hub.city}
+            />
+            <LegCard
+              leg={plan.second}
+              label={`2本目 ${plan.hub.city} → ${detour.destination.city}`}
+              fromCity={plan.hub.city}
+              toCity={detour.destination.city}
+            />
           </div>
 
           {/* Operational detail, not the headline warning — that is Radi's, above. */}
