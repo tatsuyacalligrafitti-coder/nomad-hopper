@@ -11,6 +11,7 @@ import AIExploreChat from '@/components/AIExploreChat'
 import MultiCityResults from '@/components/MultiCityResults'
 import AlertModal from '@/components/AlertModal'
 import OnboardingModal from '@/components/OnboardingModal'
+import TopGate from '@/components/TopGate'
 import type { CategorizedFlights, SearchMode, SearchQuery, MultiCityParsedQuery, MultiCitySearchResult, FlightResult, UnifiedQuery } from '@/types'
 import { sortFlights } from '@/lib/sorting'
 
@@ -57,7 +58,10 @@ const MODE_HINTS: Record<SearchMode, string> = {
 
 function unifiedToSearchQuery(uq: UnifiedQuery, rawQuery: string): SearchQuery {
   const dep = uq.legs[0]
-  const ret = uq.type === 'round-trip' ? uq.legs.find(l => l.date_role === 'arrival') : undefined
+  // LLM returns date_role:'departure' for both legs of round-trip; fallback to legs[1]
+  // （本番で実測: type は round-trip なのに2区間とも 'departure' で返る。印だけを見ると
+  //   帰りの日付が落ち、往復指定でも片道価格になる。SearchBar 側と同じ扱いに揃える）
+  const ret = uq.legs.find(l => l.date_role === 'arrival') ?? (uq.type === 'round-trip' ? uq.legs[1] : undefined)
   return {
     origin: dep.origin,
     destination: dep.destination,
@@ -207,8 +211,47 @@ export default function HomePage() {
 
   const [showOnboarding, setShowOnboarding] = useState(false)
 
+  // トップの入口（風景の帯＋Radiの問いかけ）を見せている間は false。
+  // 入口を押すと true になり、これまでの検索・相談の画面が出る。
+  const [entered, setEntered] = useState(false)
+
   const searchBarRef = useRef<SearchBarHandle>(null)
   const aiChatRef = useRef<AIChatHandle>(null)
+
+  // 入口から入るときに履歴を1つ積む。端末の「戻る」でトップに帰れるようにするため。
+  // chatMessage を渡すと、Radiが聞き出した条件を相談の最初の発言として送る。
+  const enter = (target: 'search' | 'chat', chatMessage?: string) => {
+    window.history.pushState({ tobiraEntered: true }, '')
+    setEntered(true)
+    if (target !== 'chat') return
+    if (chatMessage) aiChatRef.current?.openWithMessage(chatMessage)
+    else aiChatRef.current?.open()
+  }
+
+  // 扉1のフォームから来た文。検索画面が描かれてから渡す必要があるので、いったん置く
+  const [pendingSearchSentence, setPendingSearchSentence] = useState<string | null>(null)
+
+  const enterWithSentence = (sentence: string) => {
+    window.history.pushState({ tobiraEntered: true }, '')
+    setEntered(true)
+    setPendingSearchSentence(sentence)
+  }
+
+  const backToGate = () => {
+    window.history.back()
+  }
+
+  useEffect(() => {
+    const onPopState = () => {
+      const state = window.history.state as { tobiraEntered?: boolean } | null
+      if (!state?.tobiraEntered) {
+        setEntered(false)
+        aiChatRef.current?.close()
+      }
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
 
   const handleMultiCitySearch = async (query: MultiCityParsedQuery, rawQuery?: string) => {
     setIsMultiCityLoading(true)
@@ -283,6 +326,8 @@ export default function HomePage() {
     // LINE OAuth callback
     const lineUserId = params.get('line_user_id')
     if (lineUserId) {
+      // 共有URL・LINEからの復帰は目的が決まっているので、トップの入口は飛ばす
+      setEntered(true)
       const lineDisplayName = params.get('line_display_name') ?? ''
       try {
         const saved = sessionStorage.getItem('line_oauth_flight')
@@ -301,7 +346,7 @@ export default function HomePage() {
     const sel = params.get('sel')
     if (!q) return
 
-    searchBarRef.current?.setQuery(q)
+    setEntered(true)
 
     if (sel) {
       const indices = sel.split(',').map(n => parseInt(n, 10) || 0)
@@ -310,22 +355,11 @@ export default function HomePage() {
       setPendingSelections(selections)
     }
 
-    fetch('/api/parse-query', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: q }),
-    })
-      .then(res => res.json())
-      .then((uq: UnifiedQuery) => {
-        if (!isValidUnified(uq)) return
-        if (uq.type === 'multi-city') {
-          handleMultiCitySearch(unifiedToMultiCity(uq))
-        } else {
-          handleSearch(unifiedToSearchQuery(uq, q))
-        }
-      })
-      .catch(() => {})
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // SearchBar は entered になって初めて描かれるため、ここで setQuery を呼んでも
+    // ref がまだ無く、検索バーが空のままになる（条件のタグも出ない）。
+    // 扉1のフォームと同じ受け渡しに寄せ、検索画面が描かれてから handleChatSearch に渡す。
+    // handleChatSearch が「検索バーへの文字入れ・日付解釈・検索の実行」をまとめて行う。
+    setPendingSearchSentence(q)
   }, [])
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -611,17 +645,51 @@ export default function HomePage() {
     }
   }
 
+  // 扉1のフォームから受け取った文を、検索画面が出てから検索バーに渡して走らせる。
+  // 意図的なパターン: SearchBar は entered になって初めて描かれるため、
+  // ref が付くのを待ってから渡す必要がある。
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!entered || !pendingSearchSentence) return
+    setPendingSearchSentence(null)
+    handleChatSearch(pendingSearchSentence)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entered, pendingSearchSentence])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   return (
     <div className="min-h-screen flex flex-col">
+      {!entered && (
+        <TopGate
+          onChooseSearch={() => enter('search')}
+          onSearchSentence={enterWithSentence}
+          onChooseChat={(message) => enter('chat', message)}
+        />
+      )}
+
+      {entered && (
+      <>
       <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100 sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-2">
-          <div className="flex items-center gap-2 text-indigo-700">
+          <button
+            type="button"
+            onClick={backToGate}
+            className="flex items-center gap-2 text-indigo-700"
+            aria-label="トップにもどる"
+          >
             <Plane size={22} style={{ transform: 'rotate(-45deg)' }} />
             <span className="text-xl font-extrabold tracking-tight">Tobira</span>
-          </div>
+          </button>
           <span className="text-xs text-gray-400 hidden sm:block">
             世界への扉を、あなたの手に。
           </span>
+          <button
+            type="button"
+            onClick={backToGate}
+            className="ml-auto text-xs text-gray-500 hover:text-indigo-600 border border-gray-200 hover:border-indigo-300 rounded-full px-3 py-1.5 transition-colors"
+          >
+            ← トップにもどる
+          </button>
         </div>
       </header>
 
@@ -781,22 +849,34 @@ export default function HomePage() {
           📝 使ってみた感想を教えてください
         </a>
       </div>
+      </>
+      )}
 
+{/* AI Chat — fixed position, always rendered.
+    トップの入口を見せている間は、相談ボタンを画面に出さないため包みを display:none にする。
+    ref から open() を呼べるようにマウントは保つ。 */}
+      <div className={entered ? undefined : 'hidden'}>
+        <AIChat
+          ref={aiChatRef}
+          query={lastQuery}
+          categorized={categorized}
+          onSearchQuery={handleChatSearch}
+          onExploreMode={(rawQuery) => {
+            searchBarRef.current?.setQuery(rawQuery)
+            handleExplore({ rawQuery })
+          }}
+        />
+      </div>
 
-{/* AI Chat — fixed position, always rendered */}
-      <AIChat
-        ref={aiChatRef}
-        query={lastQuery}
-        categorized={categorized}
-        onSearchQuery={handleChatSearch}
-        onExploreMode={(rawQuery) => {
-          searchBarRef.current?.setQuery(rawQuery)
-          handleExplore({ rawQuery })
-        }}
-      />
-
-      {/* Onboarding modal + help button */}
-      <OnboardingModal forcedOpen={showOnboarding} onForcedClose={() => setShowOnboarding(false)} />
+      {/* Onboarding modal + help button
+          玄関ではRadiがアテンドするため、挨拶モーダルは自分から出さない（中身は残す）。 */}
+      {entered && (
+        <OnboardingModal
+          disableAutoOpen
+          forcedOpen={showOnboarding}
+          onForcedClose={() => setShowOnboarding(false)}
+        />
+      )}
 
       {/* LINE OAuth callback: auto-open alert modal with pre-filled userId */}
       {lineCallbackFlight && lineCallbackUserId && (

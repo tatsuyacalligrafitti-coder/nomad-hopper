@@ -5,6 +5,10 @@ import { MessageCircle, X, Send, Plane } from 'lucide-react'
 import type { CategorizedFlights, SearchQuery } from '@/types'
 
 export interface AIChatHandle {
+  /** メッセージを送らずに相談パネルだけを開く（トップの「まだ決めていない」から使う） */
+  open: () => void
+  /** トップに戻るときに開いたままにしないため閉じる */
+  close: () => void
   openWithMessage: (message: string, context?: string) => void
 }
 
@@ -135,6 +139,8 @@ const AIChat = forwardRef<AIChatHandle, Props>(function AIChat({ query, categori
   }
 
   useImperativeHandle(ref, () => ({
+    open: () => setIsOpen(true),
+    close: () => setIsOpen(false),
     openWithMessage: (message: string, context?: string) => {
       if (context) multiCityContextRef.current = context
       setIsOpen(true)
