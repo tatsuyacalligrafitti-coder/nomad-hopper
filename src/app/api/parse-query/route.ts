@@ -1,13 +1,12 @@
 import { NextRequest } from 'next/server'
 import {
   parseSearchQuery,
-  resolveAirport,
   parseDate,
   parsePassengers,
   parseCabinClass,
 } from '@/lib/parser'
 import { resolveFromDB } from '@/lib/airport-db'
-import { IATA_JP_NAMES } from '@/lib/iata-names'
+import { resolveCity } from '@/lib/resolve-place'
 import { recordNluFailure } from '@/lib/nlu-failure-log'
 import type { MultiCityParsedQuery, MultiCitySegmentQuery, ParsedQuery, UnifiedQuery } from '@/types'
 
@@ -48,42 +47,6 @@ function toUnifiedMulti(q: MultiCityParsedQuery): UnifiedQuery {
   }
 }
 
-// Inverse lookup: Japanese city name → IATA code, sorted by name length desc
-// so longer names (e.g. "東京 羽田") are matched before shorter prefixes ("東京").
-const JP_TO_IATA: Array<[string, string]> = Object.entries(IATA_JP_NAMES)
-  .map(([iata, jp]) => [jp, iata] as [string, string])
-  .sort((a, b) => b[0].length - a[0].length)
-
-// Country name → main gateway airport (for inputs like "ケニア", "フィリピン")
-const JP_COUNTRY_IATA: Record<string, string> = {
-  'ケニア': 'NBO', 'フィリピン': 'MNL', 'タイ': 'BKK', 'インドネシア': 'CGK',
-  'マレーシア': 'KUL', 'ベトナム': 'SGN', 'カンボジア': 'PNH', 'ミャンマー': 'RGN',
-  'インド': 'DEL', 'スリランカ': 'CMB', 'ネパール': 'KTM', 'モルディブ': 'MLE',
-  'エジプト': 'CAI', 'モロッコ': 'CMN', 'エチオピア': 'ADD',
-  '南アフリカ': 'JNB', 'タンザニア': 'DAR', 'ガーナ': 'ACC', 'ナイジェリア': 'LOS',
-  '中国': 'PEK', '韓国': 'ICN', '台湾': 'TPE',
-  'トルコ': 'IST', 'ギリシャ': 'ATH', 'ポルトガル': 'LIS',
-  'オーストラリア': 'SYD', 'ニュージーランド': 'AKL',
-  'カナダ': 'YVR', 'メキシコ': 'MEX', 'ブラジル': 'GRU', 'アルゼンチン': 'EZE',
-  'ペルー': 'LIM', 'コロンビア': 'BOG',
-  // Popular city aliases
-  'バリ島': 'DPS', 'バリ': 'DPS',
-  'ハワイ': 'HNL', 'ホノルル': 'HNL',
-  'ミラノ': 'MXP',
-  'バルセロナ': 'BCN',
-  'アムステルダム': 'AMS',
-  'フランクフルト': 'FRA',
-  'イスタンブール': 'IST',
-  'クアラルンプール': 'KUL', 'KL': 'KUL',
-  'ホーチミン': 'SGN', 'サイゴン': 'SGN',
-  'ハノイ': 'HAN',
-  'ジャカルタ': 'CGK',
-  'マニラ': 'MNL',
-  'ケアンズ': 'CNS',
-  'シドニー': 'SYD',
-  'メルボルン': 'MEL',
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function addDays(dateStr: string, days: number): string {
@@ -94,38 +57,6 @@ function addDays(dateStr: string, days: number): string {
 
 function todayPlus(days: number): string {
   return addDays(new Date().toISOString().split('T')[0], days)
-}
-
-/** Resolve a free-text city fragment to an IATA code. */
-function resolveCity(fragment: string): string | null {
-  const trimmed = fragment.trim()
-  if (!trimmed) return null
-
-  // 1. Full airport DB (English city/airport names, bare IATA codes)
-  const fromDB = resolveFromDB(trimmed)
-  if (fromDB) return fromDB
-
-  // 1.5. Country name shorthand (e.g. "ケニア" → NBO, "フィリピン" → MNL)
-  const fromCountry = JP_COUNTRY_IATA[trimmed]
-  if (fromCountry) return fromCountry
-
-  // 2. Japanese name — exact match (resolves "ミラノ" → MXP, "ナイロビ" → NBO, etc.)
-  for (const [jp, iata] of JP_TO_IATA) {
-    if (trimmed === jp) return iata
-  }
-
-  // 3. Japanese name — partial match (fragment contains jp name, or jp name starts with fragment)
-  for (const [jp, iata] of JP_TO_IATA) {
-    if (trimmed.includes(jp) || jp.startsWith(trimmed)) return iata
-  }
-
-  // 4. AIRPORT_MAP lightweight parser (handles common Japanese city names)
-  const p = parseSearchQuery(trimmed)
-  const code = p.origin ?? p.destination
-  if (code) return code
-
-  // 5. Phonetic/fuzzy fallback
-  return resolveAirport(trimmed)
 }
 
 /** Extract a usable base date from the full query string. */

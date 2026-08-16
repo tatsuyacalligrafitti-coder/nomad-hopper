@@ -135,6 +135,97 @@ export interface MultiCitySearchResult {
   totalPrice: number
 }
 
+// ── 遊び: 逆探知1段 ────────────────────────────────────────────────────────────
+// Prices in this section are cached-fare estimates (Travelpayouts), never live
+// bookable fares. The UI must say so wherever it shows one.
+
+export interface Hub {
+  iata: string
+  city: string
+  country: string
+}
+
+export interface LegQuote {
+  origin: string
+  destination: string
+  price: number        // JPY, one-way, one passenger
+  departDate: string   // YYYY-MM-DD the estimate was priced for
+  airline: string | null
+  transfers: number
+  link: string
+}
+
+export interface DetourPlan {
+  hub: Hub
+  first: LegQuote
+  second: LegQuote
+  total: number
+  saving: number
+  datesInconsistent: boolean  // the two legs' cheapest dates don't form a travellable order
+  detourRatio: number | null  // 1.24 = 24% further than the direct great circle
+}
+
+export type DetourOutcome =
+  | { status: 'ok'; month: string; direct: LegQuote; plan: DetourPlan; candidatesPriced: number }
+  | { status: 'no-cheaper'; month: string; direct: LegQuote; candidatesPriced: number }
+  | { status: 'no-direct'; month: string }
+  | { status: 'unavailable'; month: string }
+
+// A real, bookable fare from the four-provider stack — the same numbers the top
+// page shows. Never mixed into an arithmetic with a LegQuote estimate.
+export interface RealFare {
+  price: number
+  currency: string
+  airline: string | null
+  departDate: string
+  stops: number
+  bookingLink?: string
+}
+
+// The first beat: the plain answer, before any stopover has been proposed. Kept
+// separate from DetourOutcome because the page must be able to show the direct
+// fare without having searched for a detour — the user has not asked yet.
+//
+// `real` and `estimate` come from different sources and at least one is present
+// when the status is 'ok'. `date` is the single day the real search priced;
+// `dateFromEstimate` says whether that day came from the cached-fare data (the
+// cheapest day it knew) or is just the middle of the month.
+export type DirectOutcome =
+  | {
+      status: 'ok'
+      month: string
+      date: string
+      dateFromEstimate: boolean
+      real: RealFare | null
+      estimate: LegQuote | null
+    }
+  | { status: 'no-direct'; month: string }
+  | { status: 'unavailable'; month: string }
+
+/** Travelpayouts' cached-fare answer on its own, used to build the 拍4 comparison. */
+export type DirectEstimateOutcome =
+  | { status: 'ok'; month: string; estimate: LegQuote }
+  | { status: 'no-direct'; month: string }
+  | { status: 'unavailable'; month: string }
+
+export interface DetourPlace {
+  iata: string
+  city: string
+  country: string
+}
+
+export interface DirectResponse {
+  origin: DetourPlace
+  destination: DetourPlace
+  outcome: DirectOutcome
+}
+
+export interface DetourResponse {
+  origin: DetourPlace
+  destination: DetourPlace
+  outcome: DetourOutcome
+}
+
 export interface ModeConfig {
   id: SearchMode
   label: string

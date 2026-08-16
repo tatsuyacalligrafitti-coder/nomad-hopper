@@ -16,9 +16,24 @@ const providers: FlightProvider[] = [
   new TravelpayoutsProvider(),
 ]
 
+export interface SearchOptions {
+  /**
+   * Whether this search should leave a mark in the price-history log.
+   *
+   * Default true: pricehist is built from what real visitors actually looked up,
+   * and that is what makes it worth anything. Callers that are not a visitor
+   * searching — the /asobi experiment, any future internal probe — must pass
+   * false. Once a synthetic observation is in the log it cannot be told apart
+   * from a real one afterwards.
+   */
+  recordHistory?: boolean
+}
+
 export async function searchAllProviders(
   query: SearchQuery,
+  options: SearchOptions = {},
 ): Promise<{ flights: FlightResult[]; priceInsights?: PriceInsights }> {
+  const { recordHistory = true } = options
   const cacheKey = makeCacheKey(
     query.origin,
     query.destination,
@@ -62,8 +77,9 @@ export async function searchAllProviders(
   // Best-effort: record today's observed cheapest price for this route so the
   // price-history chart has data for every searched route (not just alerted
   // ones). Runs only on cache miss (real search); recording must never break the
-  // search itself, and 0-result searches have no price to record.
-  if (flights.length > 0) {
+  // search itself, and 0-result searches have no price to record. Skipped
+  // entirely when the caller is not a visitor searching (see SearchOptions).
+  if (recordHistory && flights.length > 0) {
     try {
       const cheapest = flights.reduce(
         (min, f) => (f.totalPrice < min.totalPrice ? f : min),
